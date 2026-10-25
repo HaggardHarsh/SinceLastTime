@@ -8,6 +8,7 @@ import { storyRoutes } from "./stories";
 import { interactionRoutes } from "./interactions";
 import { moderationRoutes } from "./moderation";
 import { segmentRoutes } from "./segments";
+import { overlayRoutes } from "./overlay";
 
 export type ApiRoute = {
   method: string;
@@ -22,6 +23,7 @@ const routes: ApiRoute[] = [
   ...interactionRoutes,
   ...moderationRoutes,
   ...segmentRoutes,
+  ...overlayRoutes,
   { method: "GET", pattern: /^auth\/twitch$/, handle: startOAuth },
   { method: "GET", pattern: /^auth\/twitch\/callback$/, handle: finishOAuth },
   { method: "POST", pattern: /^auth\/logout$/, handle: logout },

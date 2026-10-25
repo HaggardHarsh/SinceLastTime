@@ -31,6 +31,7 @@ export const moderationRoutes: ApiRoute[] = [
     await db.$transaction(async (tx) => {
       const result = await tx.statusEntry.updateMany({ where: { id, communityId, version: expectedVersion }, data: action === "approve" ? { approvedVersion: expectedVersion } : action === "hide" ? { visibility: "HIDDEN", approvedVersion: null, version: { increment: 1 } } : action === "restore" ? { visibility: "VISIBLE", approvedVersion: null, version: { increment: 1 } } : {} });
       if (!result.count) fail(409, "STALE_VERSION", "This update changed. Please refresh.");
+      if (action === "approve") await tx.queueItem.updateMany({ where: { entryId: id, state: { in: ["PENDING", "SHOWN"] }, segment: { communityId, state: { in: ["DRAFT", "LIVE"] } } }, data: { entryVersion: expectedVersion } });
       await tx.report.updateMany({ where: { entryId: id, resolvedAt: null }, data: { resolvedAt: new Date(), resolvedById: user.id } });
       if (action === "hide" || action === "restore") await invalidatePresentation(tx, communityId, id);
       if (action === "hide") await tx.followUp.updateMany({ where: { sourceEntryId: id, state: { in: ["SCHEDULED", "READY"] } }, data: { state: "CANCELED" } });

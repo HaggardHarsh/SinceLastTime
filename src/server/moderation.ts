@@ -9,6 +9,11 @@ import { HISTORY_LIFETIME } from "./time";
 import type { ApiRoute } from "./router";
 
 export const moderationRoutes: ApiRoute[] = [
+  { method: "GET", pattern: /^communities\/([^/]+)\/moderation\/statuses$/, handle: async (request, [communityId]) => {
+    const { user } = await access(request, communityId, "moderator");
+    const hidden = await db.statusEntry.findMany({ where: { communityId, visibility: "HIDDEN", body: { not: null }, createdAt: { gt: new Date(Date.now() - HISTORY_LIFETIME) }, author: { memberships: { some: { communityId, state: "ACTIVE" } } } }, include: entryInclude(communityId), orderBy: { createdAt: "desc" }, take: 100 });
+    return success({ entries: hidden.map((entry) => toCard(entry, user.id)) });
+  } },
   { method: "POST", pattern: /^communities\/([^/]+)\/statuses\/([^/]+)\/report$/, handle: async (request, [communityId, id]) => {
     const { user } = await access(request, communityId);
     await loadEntry(communityId, id);

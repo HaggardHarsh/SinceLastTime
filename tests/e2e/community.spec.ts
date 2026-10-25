@@ -14,20 +14,42 @@ let viewerId: string;
 const updateText = "The tiny thing has a next chapter. It worked!";
 
 async function login(client: APIRequestContext, login: string) {
-  const response = await client.post(`${base}/api/auth/demo`, { headers: { Origin: base }, data: { login } });
+  const response = await client.post(`${base}/api/auth/demo`, {
+    headers: { Origin: base },
+    data: { login },
+  });
   expect(response.status()).toBe(200);
 }
 test.beforeAll(async ({ request }) => {
   for (const [kind, loginName] of Object.entries(names)) {
-    const user = await db.user.create({ data: { twitchId: `demo-${loginName}`, login: loginName, displayName: kind === "owner" ? "Willow" : "Robin", avatarUrl: "", isDemo: true } });
-    createdUsers.push(user.id); if (kind === "viewer") viewerId = user.id;
+    const user = await db.user.create({
+      data: {
+        twitchId: `demo-${loginName}`,
+        login: loginName,
+        displayName: kind === "owner" ? "Willow" : "Robin",
+        avatarUrl: "",
+        isDemo: true,
+      },
+    });
+    createdUsers.push(user.id);
+    if (kind === "viewer") viewerId = user.id;
   }
   await login(request, names.owner);
-  const response = await request.post(`${base}/api/communities`, { headers: { Origin: base }, data: { displayName: "Willow’s community" } });
+  const response = await request.post(`${base}/api/communities`, {
+    headers: { Origin: base },
+    data: { displayName: "Willow’s community" },
+  });
   expect(response.status()).toBe(201);
   communityId = (await response.json()).data.id;
   await login(request, names.viewer);
-  expect((await request.post(`${base}/api/communities/${communityId}/join`, { headers: { Origin: base }, data: {} })).status()).toBe(200);
+  expect(
+    (
+      await request.post(`${base}/api/communities/${communityId}/join`, {
+        headers: { Origin: base },
+        data: {},
+      })
+    ).status(),
+  ).toBe(200);
 });
 test.afterAll(async () => {
   if (communityId) await db.community.deleteMany({ where: { id: communityId } });
@@ -43,7 +65,9 @@ test("a viewer posts safely, controls consent, and adds a linked chapter", async
   await expect(page.getByRole("heading", { name: /Hey, Robin/ })).toBeVisible();
   await page.getByLabel("Your update").fill("Today I made <b>something tiny</b>.");
   await page.getByRole("button", { name: "Share an update", exact: true }).click();
-  const card = page.locator(".status-card").filter({ hasText: "Today I made <b>something tiny</b>." });
+  const card = page
+    .locator(".status-card")
+    .filter({ hasText: "Today I made <b>something tiny</b>." });
   await expect(card).toBeVisible();
   await expect(card.locator("b")).toHaveCount(0);
   await expect(card.getByText("Community only", { exact: true })).toBeVisible();
@@ -68,12 +92,17 @@ test("a viewer posts safely, controls consent, and adds a linked chapter", async
   const updated = page.locator(".status-card").filter({ hasText: updateText });
   await expect(updated.getByText("A little follow-up", { exact: true })).toBeVisible();
   await updated.getByRole("button", { name: "A little follow-up", exact: true }).click();
-  await expect(page.getByRole("dialog").getByText("Today I made <b>something tiny</b>.", { exact: false })).toBeVisible();
+  await expect(
+    page.getByRole("dialog").getByText("Today I made <b>something tiny</b>.", { exact: false }),
+  ).toBeVisible();
   await expect(page.getByRole("dialog").getByText(updateText, { exact: false })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
-test("the streamer prepares, reviews, presents, discusses, and schedules a follow-up", async ({ page, browser }) => {
+test("the streamer prepares, reviews, presents, discusses, and schedules a follow-up", async ({
+  page,
+  browser,
+}) => {
   await login(page.request, names.owner);
   await page.goto(`/c/${names.owner}/studio`);
   await page.getByRole("button", { name: "Prepare a conversation" }).click();
@@ -95,12 +124,18 @@ test("the streamer prepares, reviews, presents, discusses, and schedules a follo
   await page.getByRole("button", { name: "Mark discussed", exact: true }).click();
   await expect(overlay.locator(".overlay-card")).toHaveCount(0);
   const follow = page.getByRole("dialog");
-  await expect(follow.getByRole("heading", { name: "Pick up the conversation later" })).toBeVisible();
+  await expect(
+    follow.getByRole("heading", { name: "Pick up the conversation later" }),
+  ).toBeVisible();
   await follow.getByLabel("Follow-up timing").selectOption("1");
   await follow.getByRole("button", { name: "Invite an update" }).click();
   await expect(follow).not.toBeVisible();
-  const latest = await db.statusEntry.findFirstOrThrow({ where: { communityId, body: updateText } });
-  expect(await db.followUp.count({ where: { sourceEntryId: latest.id, state: "SCHEDULED" } })).toBe(1);
+  const latest = await db.statusEntry.findFirstOrThrow({
+    where: { communityId, body: updateText },
+  });
+  expect(await db.followUp.count({ where: { sourceEntryId: latest.id, state: "SCHEDULED" } })).toBe(
+    1,
+  );
   await page.getByRole("button", { name: "End segment", exact: true }).click();
   await expect(page.getByRole("button", { name: "Prepare a conversation" })).toBeVisible();
   await overlayContext.close();
@@ -110,7 +145,9 @@ test("a non-follower cannot open community updates", async ({ page }) => {
   await login(page.request, "visitor");
   await page.goto(`/c/${names.owner}`);
   await page.getByRole("button", { name: "Join this community", exact: true }).click();
-  await expect(page.locator(".toast-error[role=alert]")).toContainText("Follow this streamer on Twitch");
+  await expect(page.locator(".toast-error[role=alert]")).toContainText(
+    "Follow this streamer on Twitch",
+  );
   await expect(page.locator(".status-card")).toHaveCount(0);
 });
 
@@ -119,14 +156,18 @@ test("mobile board, profile, and catch-ups work without horizontal overflow", as
   await login(page.request, names.viewer);
   await page.goto(`/c/${names.owner}`);
   await expect(page.getByRole("heading", { name: /Hey, Robin/ })).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
   await page.goto(`/c/${names.owner}/members/${viewerId}`);
   await expect(page.getByRole("heading", { name: "Your story so far." })).toBeVisible();
   await expect(page.locator(".status-card")).toHaveCount(2);
   await page.goto("/notifications");
   await expect(page.getByRole("heading", { name: "Your catch-ups." })).toBeVisible();
   await expect(page.getByText("You caught up on stream.", { exact: true })).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
 });
 
 test("landing and sharing guide have working navigation", async ({ page }) => {

@@ -2,7 +2,26 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, Check, CheckCheck, ChevronRight, CircleStop, Copy, CornerDownRight, Eye, Monitor, Plus, Radio, RefreshCw, Send, SkipForward, Sparkles, Video, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Check,
+  CheckCheck,
+  ChevronRight,
+  CircleStop,
+  Copy,
+  CornerDownRight,
+  Eye,
+  Monitor,
+  Plus,
+  Radio,
+  RefreshCw,
+  Send,
+  SkipForward,
+  Sparkles,
+  Video,
+  X,
+} from "lucide-react";
 import { api } from "@/lib/api";
 import type { EntryCard } from "@/shared/types";
 import { AppShell } from "./shell";
@@ -10,16 +29,37 @@ import { useBoard } from "./use-board";
 import { useAction, useFeedback } from "./providers";
 import { Avatar, Dialog, EmptyState, ErrorState, LoadingState } from "./ui";
 
-type QueueItem = { id: string; entryVersion: number; position: number; reason: string; state: string; entry: EntryCard };
-type StudioState = { segment: { id: string; state: string; discussionCount: number; queue: QueueItem[] } | null; candidates: EntryCard[] };
-const reasons: Record<string, string> = { FIRST_TIME: "Hasn’t been featured yet", ROTATION: "Time to catch up again", COMMUNITY: "Community pick", FOLLOW_UP: "A new chapter", MANUAL: "Picked by your team" };
+type QueueItem = {
+  id: string;
+  entryVersion: number;
+  position: number;
+  reason: string;
+  state: string;
+  entry: EntryCard;
+};
+type StudioState = {
+  segment: { id: string; state: string; discussionCount: number; queue: QueueItem[] } | null;
+  candidates: EntryCard[];
+};
+const reasons: Record<string, string> = {
+  FIRST_TIME: "Hasn’t been featured yet",
+  ROTATION: "Time to catch up again",
+  COMMUNITY: "Community pick",
+  FOLLOW_UP: "A new chapter",
+  MANUAL: "Picked by your team",
+};
 
 export function Studio({ slug }: { slug: string }) {
   const board = useBoard(slug);
   const community = board.community;
   const owner = board.role === "OWNER";
   const staff = owner || board.role === "MODERATOR";
-  const state = useQuery({ queryKey: ["community", community?.id, "studio"], queryFn: () => api<StudioState>(`communities/${community!.id}/segments`), enabled: Boolean(community && board.joined && staff), refetchInterval: 2000 });
+  const state = useQuery({
+    queryKey: ["community", community?.id, "studio"],
+    queryFn: () => api<StudioState>(`communities/${community!.id}/segments`),
+    enabled: Boolean(community && board.joined && staff),
+    refetchInterval: 2000,
+  });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<"overlay" | "add" | "reply" | "followup" | null>(null);
   const [overlayUrl, setOverlayUrl] = useState("");
@@ -30,33 +70,604 @@ export function Studio({ slug }: { slug: string }) {
   const { notify } = useFeedback();
   const segment = state.data?.segment;
   const queue = segment?.queue ?? [];
-  const selected = queue.find((item) => item.entry.id === selectedId) ?? queue.find((item) => item.state === "SHOWN" || item.state === "PENDING") ?? queue[0];
+  const selected =
+    queue.find((item) => item.entry.id === selectedId) ??
+    queue.find((item) => item.state === "SHOWN" || item.state === "PENDING") ??
+    queue[0];
   const entry = selected?.entry;
-  const story = useQuery({ queryKey: ["community", community?.id, "story", entry?.storyId], queryFn: () => api<{ entries: EntryCard[] }>(`communities/${community!.id}/stories/${entry!.storyId}`), enabled: Boolean(community && entry?.hasPrevious && staff) });
-  const previous = story.data?.entries.filter((item) => item.id !== entry?.id && new Date(item.createdAt) < new Date(entry!.createdAt)).at(-1);
+  const story = useQuery({
+    queryKey: ["community", community?.id, "story", entry?.storyId],
+    queryFn: () =>
+      api<{ entries: EntryCard[] }>(`communities/${community!.id}/stories/${entry!.storyId}`),
+    enabled: Boolean(community && entry?.hasPrevious && staff),
+  });
+  const previous = story.data?.entries
+    .filter(
+      (item) => item.id !== entry?.id && new Date(item.createdAt) < new Date(entry!.createdAt),
+    )
+    .at(-1);
   const approved = entry?.approvedVersion === entry?.version;
-  const usable = entry && entry.allowOnStream && entry.isCurrent && entry.visibility === "VISIBLE" && new Date(entry.expiresAt).getTime() > Date.now() && !entry.reportCount;
+  const usable =
+    entry &&
+    entry.allowOnStream &&
+    entry.isCurrent &&
+    entry.visibility === "VISIBLE" &&
+    new Date(entry.expiresAt).getTime() > Date.now() &&
+    !entry.reportCount;
   const endpoint = `communities/${community?.id}/segments/${segment?.id}`;
-  async function saveQueue(items: QueueItem[]) { await api(`${endpoint}/queue`, { method: "PUT", body: { entries: items.map((item) => ({ id: item.entry.id, version: item.entry.version })) } }); }
-  return <AppShell community={community} role={board.role} active="studio"><main className="page-content studio-content">
-    <div className="page-heading"><div><span className="eyebrow"><Video size={12} /> MAKE A LITTLE TIME</span><h1>The conversation studio.</h1><p>Five little updates. A few real conversations. Pick up where you left off.</p></div>{owner && <button className="button button-secondary" onClick={() => setDialog("overlay")}><Monitor size={15} />OBS setup</button>}</div>
-    {board.lookup.error || board.details.error || state.error ? <ErrorState message={(board.lookup.error ?? board.details.error ?? state.error)!.message} retry={() => void state.refetch()} /> : !community || !board.role ? <LoadingState /> : !staff ? <EmptyState title="A space for your community team">The streamer and board moderators prepare conversations here.</EmptyState> : state.isPending ? <LoadingState /> : !segment ? <EmptyState title="Make room for a little catch-up" action={<button className="button button-primary" disabled={pending} onClick={() => void run(() => api(`communities/${community.id}/segments`, { method: "POST", body: {} }))}><Sparkles size={15} />Prepare a conversation</button>}>We’ll suggest a fair mix of fresh voices, a community favorite, and a follow-up. You choose what makes it to stream.</EmptyState> : <>
-      <div className="studio-status-bar"><span className={`segment-state ${segment.state === "LIVE" ? "live" : ""}`}><span />{segment.state === "LIVE" ? "SEGMENT LIVE" : "GETTING READY"}</span><span>{segment.discussionCount} conversations so far</span><div>{segment.state === "DRAFT" ? <button className="button button-primary" disabled={pending || !queue.length || !owner} onClick={() => void run(() => api(`${endpoint}/start`, { method: "POST", body: {} }))}><Radio size={14} />Start segment</button> : owner && <><button className="button button-secondary" disabled={pending} onClick={() => void run(() => api(`${endpoint}/clear`, { method: "POST", body: {} }))}><Eye size={14} />Clear overlay</button><button className="button button-secondary" disabled={pending} onClick={() => void run(() => api(`${endpoint}/end`, { method: "POST", body: {} }), "A little more caught up. Segment ended.")}><CircleStop size={14} />End segment</button></>}</div></div>
-      <div className="studio-grid"><section className="lineup-panel"><div className="panel-heading"><h2>Your little lineup <span>{queue.length}/5</span></h2><button className="icon-button" aria-label="Regenerate fair shortlist" disabled={pending || segment.state !== "DRAFT"} onClick={() => void run(() => api(`${endpoint}/queue`, { method: "PUT", body: { regenerate: true } }))}><RefreshCw size={15} /></button></div>
-      <p className="lineup-caption">Fresh voices, a favorite, and a next chapter.</p><div className="lineup-list">{queue.map((item, index) => <div key={item.id} className={`lineup-item ${selected?.id === item.id ? "selected" : ""} ${["DISCUSSED", "SKIPPED"].includes(item.state) ? "finished" : ""}`}><button className="lineup-select" onClick={() => setSelectedId(item.entry.id)}><span className="lineup-number">{item.state === "DISCUSSED" ? <Check size={13} /> : index + 1}</span><Avatar name={item.entry.author.displayName} url={item.entry.author.avatarUrl} size="sm" /><span><strong>{item.entry.author.displayName}<span>{item.entry.emoji}</span></strong><small>{reasons[item.reason] ?? item.reason}</small></span>{item.state === "SHOWN" && <Radio size={13} />}</button>{segment.state === "DRAFT" && <div className="lineup-edit"><button className="icon-button" aria-label={`Move ${item.entry.author.displayName} up`} disabled={pending || index === 0} onClick={() => { const items = [...queue]; [items[index - 1], items[index]] = [items[index], items[index - 1]]; void run(() => saveQueue(items)); }}><ArrowUp size={12} /></button><button className="icon-button" aria-label={`Move ${item.entry.author.displayName} down`} disabled={pending || index === queue.length - 1} onClick={() => { const items = [...queue]; [items[index + 1], items[index]] = [items[index], items[index + 1]]; void run(() => saveQueue(items)); }}><ArrowDown size={12} /></button><button className="icon-button" aria-label={`Remove ${item.entry.author.displayName} from lineup`} disabled={pending} onClick={() => void run(() => saveQueue(queue.filter((q) => q.id !== item.id)))}><X size={12} /></button></div>}</div>)}</div>
-      {segment.state === "DRAFT" && queue.length < 5 && <button className="add-lineup" onClick={() => setDialog("add")}><Plus size={15} />Make a little room</button>}<div className="lineup-footnote"><Sparkles size={15} /><p>Everyone gets a turn. Votes help pick one card; the rest make room for different voices.</p></div></section>
-      <section className="preview-panel"><div className="preview-heading"><span className="eyebrow"><Eye size={12} /> YOUR PRIVATE PREVIEW</span><span>{entry && selected?.state === "SHOWN" ? "On the overlay now" : "Only you and your team can see this"}</span></div>{!entry ? <EmptyState title="A little space, ready for a story">Add an update to your lineup to get started.</EmptyState> : <>
-        <div className="studio-preview-card"><div className="preview-card-header"><Avatar name={entry.author.displayName} url={entry.author.avatarUrl} size="lg" /><div><h2>{entry.author.displayName}</h2><span>{entry.category} · {reasons[selected.reason]}</span></div><span className="preview-large-emoji">{entry.emoji}</span></div>{previous && <div className="preview-context"><span>LAST TIME {previous.allowOnStream && previous.approvedVersion === previous.version ? "· APPROVED CONTEXT" : "· COMMUNITY CONTEXT ONLY"}</span><p>{previous.body}</p></div>}<p className="preview-card-body">{entry.body || "This update is no longer available."}</p><div className="preview-card-footer"><span>{approved ? <><Check size={13} />Reviewed for this version</> : <><Eye size={13} />A quick review before it goes live</>}</span><span>SinceLastTime<span className="brand-dot">.</span></span></div></div>
-        {!usable && <div className="notice">This update has changed or is no longer available for broadcast. Choose another card.</div>}
-        <div className="studio-actions">{usable && !approved && <button className="button button-primary" disabled={pending} onClick={() => void run(() => api(`communities/${community.id}/statuses/${entry.id}/review`, { method: "POST", body: { action: "approve", expectedVersion: entry.version } }), "This version is approved for stream.")}><CheckCheck size={15} />Review and approve</button>}{owner && <><button className="button button-primary" disabled={pending || !usable || !approved || segment.state !== "LIVE" || ["DISCUSSED", "SKIPPED"].includes(selected.state)} onClick={() => void run(() => api(`${endpoint}/show`, { method: "POST", body: { entryId: entry.id, expectedVersion: entry.version } }))}><Monitor size={15} />Show on stream</button><button className="button button-secondary" disabled={pending || selected.state !== "SHOWN" || segment.state !== "LIVE"} onClick={() => void run(async () => { await api(`${endpoint}/discuss`, { method: "POST", body: { entryId: entry.id } }); if (entry.allowFollowUp && !entry.followUp) { setFollowEntry(entry); setDialog("followup"); } setSelectedId(null); }, "A little more connected. 💜")}><Check size={15} />Mark discussed</button><button className="text-button" disabled={pending || ["DISCUSSED", "SKIPPED"].includes(selected.state)} onClick={() => void run(async () => { await api(`${endpoint}/skip`, { method: "POST", body: { entryId: entry.id } }); setSelectedId(null); })}><SkipForward size={14} />Skip for now</button></>}{!owner && <p className="fine-print">The streamer controls what appears on the broadcast.</p>}</div>
-        {owner && <div className="studio-secondary-actions"><button className="text-button" onClick={() => { setReply(entry.reply?.body ?? ""); setDialog("reply"); }}><Send size={13} />Leave a little reply</button>{entry.discussed && entry.allowFollowUp && !entry.followUp && <button className="text-button" onClick={() => { setFollowEntry(entry); setDialog("followup"); }}><CornerDownRight size={14} />Ask how it goes</button>}</div>}
-      </>}</section></div>
-    </>}
-    <Dialog open={dialog !== null} title={dialog === "overlay" ? "A little window into your stream" : dialog === "add" ? "Pick a little update" : dialog === "reply" ? "A note from you" : "Pick up the conversation later"} onClose={() => setDialog(null)}>
-      {dialog === "overlay" && <div className="dialog-form"><p>Add a Browser Source in OBS at 1920 × 1080. Only the card you explicitly show appears there. This link controls read-only access to that card.</p><button className="button button-primary" disabled={pending} onClick={() => void run(async () => { const result = await api<{ url: string }>(`communities/${community!.id}/overlay-token`, { method: "POST", body: {} }); setOverlayUrl(result.url); })}>{overlayUrl ? "Rotate overlay link" : "Generate overlay link"}</button>{overlayUrl && <><label>Overlay URL<input aria-label="Overlay URL" readOnly value={overlayUrl} onFocus={(e) => e.target.select()} /></label><button className="button button-secondary" onClick={() => { void navigator.clipboard.writeText(overlayUrl).then(() => notify("Overlay link copied."), () => notify("Select and copy the link above.", true)); }}><Copy size={14} />Copy link</button></>}<p className="fine-print">A new link replaces the old one. Save it in OBS before closing this dialog.</p></div>}
-      {dialog === "add" && <div className="candidate-list">{state.data?.candidates.filter((candidate) => !queue.some((q) => q.entry.author.id === candidate.author.id)).map((candidate) => <button key={candidate.id} disabled={pending} onClick={() => void run(async () => { await api(`${endpoint}/queue`, { method: "PUT", body: { entries: [...queue.map((q) => ({ id: q.entry.id, version: q.entry.version })), { id: candidate.id, version: candidate.version }] } }); setDialog(null); })}><Avatar name={candidate.author.displayName} url={candidate.author.avatarUrl} size="sm" /><span><strong>{candidate.author.displayName}</strong><small>{candidate.body}</small></span><Plus size={16} /></button>)}</div>}
-      {dialog === "reply" && entry && <form className="dialog-form" onSubmit={(event) => { event.preventDefault(); void run(async () => { await api(`communities/${community!.id}/statuses/${entry.id}/reply`, { method: "PUT", body: { body: reply } }); setDialog(null); }, "Your reply is shared."); }}><label>Your reply to {entry.author.displayName}<textarea value={reply} onChange={(event) => setReply(event.target.value)} required maxLength={280} /></label><button className="button button-primary" disabled={pending}>Share your reply</button></form>}
-      {dialog === "followup" && followEntry && <form className="dialog-form" onSubmit={(event) => { event.preventDefault(); void run(async () => { await api(`communities/${community!.id}/statuses/${followEntry.id}/follow-up`, { method: "POST", body: { days } }); setDialog(null); }, "A little invitation to share what happens next."); }}><p>{followEntry.author.displayName} welcomed a follow-up. Send one gentle in-app invitation to add an update.</p><label>When should we check in?<select aria-label="Follow-up timing" value={days} onChange={(e) => setDays(Number(e.target.value))}>{[1, 3, 7, 14].map((n) => <option key={n} value={n}>In {n} {n === 1 ? "day" : "days"}</option>)}</select></label><button className="button button-primary" disabled={pending}>Invite an update<CornerDownRight size={14} /></button></form>}
-    </Dialog>
-  </main></AppShell>;
+  async function saveQueue(items: QueueItem[]) {
+    await api(`${endpoint}/queue`, {
+      method: "PUT",
+      body: { entries: items.map((item) => ({ id: item.entry.id, version: item.entry.version })) },
+    });
+  }
+  return (
+    <AppShell community={community} role={board.role} active="studio">
+      <main className="page-content studio-content">
+        <div className="page-heading">
+          <div>
+            <span className="eyebrow">
+              <Video size={12} /> MAKE A LITTLE TIME
+            </span>
+            <h1>The conversation studio.</h1>
+            <p>Five little updates. A few real conversations. Pick up where you left off.</p>
+          </div>
+          {owner && (
+            <button className="button button-secondary" onClick={() => setDialog("overlay")}>
+              <Monitor size={15} />
+              OBS setup
+            </button>
+          )}
+        </div>
+        {board.lookup.error || board.details.error || state.error ? (
+          <ErrorState
+            message={(board.lookup.error ?? board.details.error ?? state.error)!.message}
+            retry={() => void state.refetch()}
+          />
+        ) : !community || !board.role ? (
+          <LoadingState />
+        ) : !staff ? (
+          <EmptyState title="A space for your community team">
+            The streamer and board moderators prepare conversations here.
+          </EmptyState>
+        ) : state.isPending ? (
+          <LoadingState />
+        ) : !segment ? (
+          <EmptyState
+            title="Make room for a little catch-up"
+            action={
+              <button
+                className="button button-primary"
+                disabled={pending}
+                onClick={() =>
+                  void run(() =>
+                    api(`communities/${community.id}/segments`, { method: "POST", body: {} }),
+                  )
+                }
+              >
+                <Sparkles size={15} />
+                Prepare a conversation
+              </button>
+            }
+          >
+            We’ll suggest a fair mix of fresh voices, a community favorite, and a follow-up. You
+            choose what makes it to stream.
+          </EmptyState>
+        ) : (
+          <>
+            <div className="studio-status-bar">
+              <span className={`segment-state ${segment.state === "LIVE" ? "live" : ""}`}>
+                <span />
+                {segment.state === "LIVE" ? "SEGMENT LIVE" : "GETTING READY"}
+              </span>
+              <span>{segment.discussionCount} conversations so far</span>
+              <div>
+                {segment.state === "DRAFT" ? (
+                  <button
+                    className="button button-primary"
+                    disabled={pending || !queue.length || !owner}
+                    onClick={() =>
+                      void run(() => api(`${endpoint}/start`, { method: "POST", body: {} }))
+                    }
+                  >
+                    <Radio size={14} />
+                    Start segment
+                  </button>
+                ) : (
+                  owner && (
+                    <>
+                      <button
+                        className="button button-secondary"
+                        disabled={pending}
+                        onClick={() =>
+                          void run(() => api(`${endpoint}/clear`, { method: "POST", body: {} }))
+                        }
+                      >
+                        <Eye size={14} />
+                        Clear overlay
+                      </button>
+                      <button
+                        className="button button-secondary"
+                        disabled={pending}
+                        onClick={() =>
+                          void run(
+                            () => api(`${endpoint}/end`, { method: "POST", body: {} }),
+                            "A little more caught up. Segment ended.",
+                          )
+                        }
+                      >
+                        <CircleStop size={14} />
+                        End segment
+                      </button>
+                    </>
+                  )
+                )}
+              </div>
+            </div>
+            <div className="studio-grid">
+              <section className="lineup-panel">
+                <div className="panel-heading">
+                  <h2>
+                    Your little lineup <span>{queue.length}/5</span>
+                  </h2>
+                  <button
+                    className="icon-button"
+                    aria-label="Regenerate fair shortlist"
+                    disabled={pending || segment.state !== "DRAFT"}
+                    onClick={() =>
+                      void run(() =>
+                        api(`${endpoint}/queue`, { method: "PUT", body: { regenerate: true } }),
+                      )
+                    }
+                  >
+                    <RefreshCw size={15} />
+                  </button>
+                </div>
+                <p className="lineup-caption">Fresh voices, a favorite, and a next chapter.</p>
+                <div className="lineup-list">
+                  {queue.map((item, index) => (
+                    <div
+                      key={item.id}
+                      className={`lineup-item ${selected?.id === item.id ? "selected" : ""} ${["DISCUSSED", "SKIPPED"].includes(item.state) ? "finished" : ""}`}
+                    >
+                      <button
+                        className="lineup-select"
+                        onClick={() => setSelectedId(item.entry.id)}
+                      >
+                        <span className="lineup-number">
+                          {item.state === "DISCUSSED" ? <Check size={13} /> : index + 1}
+                        </span>
+                        <Avatar
+                          name={item.entry.author.displayName}
+                          url={item.entry.author.avatarUrl}
+                          size="sm"
+                        />
+                        <span>
+                          <strong>
+                            {item.entry.author.displayName}
+                            <span>{item.entry.emoji}</span>
+                          </strong>
+                          <small>{reasons[item.reason] ?? item.reason}</small>
+                        </span>
+                        {item.state === "SHOWN" && <Radio size={13} />}
+                      </button>
+                      {segment.state === "DRAFT" && (
+                        <div className="lineup-edit">
+                          <button
+                            className="icon-button"
+                            aria-label={`Move ${item.entry.author.displayName} up`}
+                            disabled={pending || index === 0}
+                            onClick={() => {
+                              const items = [...queue];
+                              [items[index - 1], items[index]] = [items[index], items[index - 1]];
+                              void run(() => saveQueue(items));
+                            }}
+                          >
+                            <ArrowUp size={12} />
+                          </button>
+                          <button
+                            className="icon-button"
+                            aria-label={`Move ${item.entry.author.displayName} down`}
+                            disabled={pending || index === queue.length - 1}
+                            onClick={() => {
+                              const items = [...queue];
+                              [items[index + 1], items[index]] = [items[index], items[index + 1]];
+                              void run(() => saveQueue(items));
+                            }}
+                          >
+                            <ArrowDown size={12} />
+                          </button>
+                          <button
+                            className="icon-button"
+                            aria-label={`Remove ${item.entry.author.displayName} from lineup`}
+                            disabled={pending}
+                            onClick={() =>
+                              void run(() => saveQueue(queue.filter((q) => q.id !== item.id)))
+                            }
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {segment.state === "DRAFT" && queue.length < 5 && (
+                  <button className="add-lineup" onClick={() => setDialog("add")}>
+                    <Plus size={15} />
+                    Make a little room
+                  </button>
+                )}
+                <div className="lineup-footnote">
+                  <Sparkles size={15} />
+                  <p>
+                    Everyone gets a turn. Votes help pick one card; the rest make room for different
+                    voices.
+                  </p>
+                </div>
+              </section>
+              <section className="preview-panel">
+                <div className="preview-heading">
+                  <span className="eyebrow">
+                    <Eye size={12} /> YOUR PRIVATE PREVIEW
+                  </span>
+                  <span>
+                    {entry && selected?.state === "SHOWN"
+                      ? "On the overlay now"
+                      : "Only you and your team can see this"}
+                  </span>
+                </div>
+                {!entry ? (
+                  <EmptyState title="A little space, ready for a story">
+                    Add an update to your lineup to get started.
+                  </EmptyState>
+                ) : (
+                  <>
+                    <div className="studio-preview-card">
+                      <div className="preview-card-header">
+                        <Avatar
+                          name={entry.author.displayName}
+                          url={entry.author.avatarUrl}
+                          size="lg"
+                        />
+                        <div>
+                          <h2>{entry.author.displayName}</h2>
+                          <span>
+                            {entry.category} · {reasons[selected.reason]}
+                          </span>
+                        </div>
+                        <span className="preview-large-emoji">{entry.emoji}</span>
+                      </div>
+                      {previous && (
+                        <div className="preview-context">
+                          <span>
+                            LAST TIME{" "}
+                            {previous.allowOnStream && previous.approvedVersion === previous.version
+                              ? "· APPROVED CONTEXT"
+                              : "· COMMUNITY CONTEXT ONLY"}
+                          </span>
+                          <p>{previous.body}</p>
+                        </div>
+                      )}
+                      <p className="preview-card-body">
+                        {entry.body || "This update is no longer available."}
+                      </p>
+                      <div className="preview-card-footer">
+                        <span>
+                          {approved ? (
+                            <>
+                              <Check size={13} />
+                              Reviewed for this version
+                            </>
+                          ) : (
+                            <>
+                              <Eye size={13} />A quick review before it goes live
+                            </>
+                          )}
+                        </span>
+                        <span>
+                          SinceLastTime<span className="brand-dot">.</span>
+                        </span>
+                      </div>
+                    </div>
+                    {!usable && (
+                      <div className="notice">
+                        This update has changed or is no longer available for broadcast. Choose
+                        another card.
+                      </div>
+                    )}
+                    <div className="studio-actions">
+                      {usable && !approved && (
+                        <button
+                          className="button button-primary"
+                          disabled={pending}
+                          onClick={() =>
+                            void run(
+                              () =>
+                                api(`communities/${community.id}/statuses/${entry.id}/review`, {
+                                  method: "POST",
+                                  body: { action: "approve", expectedVersion: entry.version },
+                                }),
+                              "This version is approved for stream.",
+                            )
+                          }
+                        >
+                          <CheckCheck size={15} />
+                          Review and approve
+                        </button>
+                      )}
+                      {owner && (
+                        <>
+                          <button
+                            className="button button-primary"
+                            disabled={
+                              pending ||
+                              !usable ||
+                              !approved ||
+                              segment.state !== "LIVE" ||
+                              ["DISCUSSED", "SKIPPED"].includes(selected.state)
+                            }
+                            onClick={() =>
+                              void run(() =>
+                                api(`${endpoint}/show`, {
+                                  method: "POST",
+                                  body: { entryId: entry.id, expectedVersion: entry.version },
+                                }),
+                              )
+                            }
+                          >
+                            <Monitor size={15} />
+                            Show on stream
+                          </button>
+                          <button
+                            className="button button-secondary"
+                            disabled={
+                              pending || selected.state !== "SHOWN" || segment.state !== "LIVE"
+                            }
+                            onClick={() =>
+                              void run(async () => {
+                                await api(`${endpoint}/discuss`, {
+                                  method: "POST",
+                                  body: { entryId: entry.id },
+                                });
+                                if (entry.allowFollowUp && !entry.followUp) {
+                                  setFollowEntry(entry);
+                                  setDialog("followup");
+                                }
+                                setSelectedId(null);
+                              }, "A little more connected. 💜")
+                            }
+                          >
+                            <Check size={15} />
+                            Mark discussed
+                          </button>
+                          <button
+                            className="text-button"
+                            disabled={pending || ["DISCUSSED", "SKIPPED"].includes(selected.state)}
+                            onClick={() =>
+                              void run(async () => {
+                                await api(`${endpoint}/skip`, {
+                                  method: "POST",
+                                  body: { entryId: entry.id },
+                                });
+                                setSelectedId(null);
+                              })
+                            }
+                          >
+                            <SkipForward size={14} />
+                            Skip for now
+                          </button>
+                        </>
+                      )}
+                      {!owner && (
+                        <p className="fine-print">
+                          The streamer controls what appears on the broadcast.
+                        </p>
+                      )}
+                    </div>
+                    {owner && (
+                      <div className="studio-secondary-actions">
+                        <button
+                          className="text-button"
+                          onClick={() => {
+                            setReply(entry.reply?.body ?? "");
+                            setDialog("reply");
+                          }}
+                        >
+                          <Send size={13} />
+                          Leave a little reply
+                        </button>
+                        {entry.discussed && entry.allowFollowUp && !entry.followUp && (
+                          <button
+                            className="text-button"
+                            onClick={() => {
+                              setFollowEntry(entry);
+                              setDialog("followup");
+                            }}
+                          >
+                            <CornerDownRight size={14} />
+                            Ask how it goes
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </section>
+            </div>
+          </>
+        )}
+        <Dialog
+          open={dialog !== null}
+          title={
+            dialog === "overlay"
+              ? "A little window into your stream"
+              : dialog === "add"
+                ? "Pick a little update"
+                : dialog === "reply"
+                  ? "A note from you"
+                  : "Pick up the conversation later"
+          }
+          onClose={() => setDialog(null)}
+        >
+          {dialog === "overlay" && (
+            <div className="dialog-form">
+              <p>
+                Add a Browser Source in OBS at 1920 × 1080. Only the card you explicitly show
+                appears there. This link controls read-only access to that card.
+              </p>
+              <button
+                className="button button-primary"
+                disabled={pending}
+                onClick={() =>
+                  void run(async () => {
+                    const result = await api<{ url: string }>(
+                      `communities/${community!.id}/overlay-token`,
+                      { method: "POST", body: {} },
+                    );
+                    setOverlayUrl(result.url);
+                  })
+                }
+              >
+                {overlayUrl ? "Rotate overlay link" : "Generate overlay link"}
+              </button>
+              {overlayUrl && (
+                <>
+                  <label>
+                    Overlay URL
+                    <input
+                      aria-label="Overlay URL"
+                      readOnly
+                      value={overlayUrl}
+                      onFocus={(e) => e.target.select()}
+                    />
+                  </label>
+                  <button
+                    className="button button-secondary"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(overlayUrl).then(
+                        () => notify("Overlay link copied."),
+                        () => notify("Select and copy the link above.", true),
+                      );
+                    }}
+                  >
+                    <Copy size={14} />
+                    Copy link
+                  </button>
+                </>
+              )}
+              <p className="fine-print">
+                A new link replaces the old one. Save it in OBS before closing this dialog.
+              </p>
+            </div>
+          )}
+          {dialog === "add" && (
+            <div className="candidate-list">
+              {state.data?.candidates
+                .filter(
+                  (candidate) => !queue.some((q) => q.entry.author.id === candidate.author.id),
+                )
+                .map((candidate) => (
+                  <button
+                    key={candidate.id}
+                    disabled={pending}
+                    onClick={() =>
+                      void run(async () => {
+                        await api(`${endpoint}/queue`, {
+                          method: "PUT",
+                          body: {
+                            entries: [
+                              ...queue.map((q) => ({ id: q.entry.id, version: q.entry.version })),
+                              { id: candidate.id, version: candidate.version },
+                            ],
+                          },
+                        });
+                        setDialog(null);
+                      })
+                    }
+                  >
+                    <Avatar
+                      name={candidate.author.displayName}
+                      url={candidate.author.avatarUrl}
+                      size="sm"
+                    />
+                    <span>
+                      <strong>{candidate.author.displayName}</strong>
+                      <small>{candidate.body}</small>
+                    </span>
+                    <Plus size={16} />
+                  </button>
+                ))}
+            </div>
+          )}
+          {dialog === "reply" && entry && (
+            <form
+              className="dialog-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void run(async () => {
+                  await api(`communities/${community!.id}/statuses/${entry.id}/reply`, {
+                    method: "PUT",
+                    body: { body: reply },
+                  });
+                  setDialog(null);
+                }, "Your reply is shared.");
+              }}
+            >
+              <label>
+                Your reply to {entry.author.displayName}
+                <textarea
+                  value={reply}
+                  onChange={(event) => setReply(event.target.value)}
+                  required
+                  maxLength={280}
+                />
+              </label>
+              <button className="button button-primary" disabled={pending}>
+                Share your reply
+              </button>
+            </form>
+          )}
+          {dialog === "followup" && followEntry && (
+            <form
+              className="dialog-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void run(async () => {
+                  await api(`communities/${community!.id}/statuses/${followEntry.id}/follow-up`, {
+                    method: "POST",
+                    body: { days },
+                  });
+                  setDialog(null);
+                }, "A little invitation to share what happens next.");
+              }}
+            >
+              <p>
+                {followEntry.author.displayName} welcomed a follow-up. Send one gentle in-app
+                invitation to add an update.
+              </p>
+              <label>
+                When should we check in?
+                <select
+                  aria-label="Follow-up timing"
+                  value={days}
+                  onChange={(e) => setDays(Number(e.target.value))}
+                >
+                  {[1, 3, 7, 14].map((n) => (
+                    <option key={n} value={n}>
+                      In {n} {n === 1 ? "day" : "days"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button className="button button-primary" disabled={pending}>
+                Invite an update
+                <CornerDownRight size={14} />
+              </button>
+            </form>
+          )}
+        </Dialog>
+      </main>
+    </AppShell>
+  );
 }

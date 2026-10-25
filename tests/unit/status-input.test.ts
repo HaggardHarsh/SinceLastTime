@@ -4,10 +4,16 @@ import { graphemeLength } from "../../src/server/time";
 
 describe("status input", () => {
   it("requires explicit consent for public broadcast and reminders", () => {
-    expect(statusInput.parse({ body: "A small update" })).toMatchObject({ allowOnStream: false, allowFollowUp: false });
+    expect(statusInput.parse({ body: "A small update" })).toMatchObject({
+      allowOnStream: false,
+      allowFollowUp: false,
+    });
   });
   it("keeps omitted patch fields unchanged", () => {
-    expect(statusPatchInput.parse({ expectedVersion: 3, allowOnStream: false })).toEqual({ expectedVersion: 3, allowOnStream: false });
+    expect(statusPatchInput.parse({ expectedVersion: 3, allowOnStream: false })).toEqual({
+      expectedVersion: 3,
+      allowOnStream: false,
+    });
   });
   it("counts composed emoji as a character", () => {
     expect(graphemeLength("👨‍👩‍👧‍👦")).toBe(1);

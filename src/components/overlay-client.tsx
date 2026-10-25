@@ -2,7 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 
-type OverlayCard = { id: string; body: string; emoji: string | null; author: { displayName: string; avatarUrl: string }; communityName: string; previous: { body: string } | null };
+type OverlayCard = {
+  id: string;
+  body: string;
+  emoji: string | null;
+  author: { displayName: string; avatarUrl: string };
+  communityName: string;
+  previous: { body: string } | null;
+};
 
 export function OverlayClient({ communityId }: { communityId: string }) {
   const [card, setCard] = useState<OverlayCard | null>(null);
@@ -21,28 +28,57 @@ export function OverlayClient({ communityId }: { communityId: string }) {
       controller = new AbortController();
       const timeout = setTimeout(() => controller?.abort(), 2500);
       try {
-        const response = await fetch(`/api/overlay/${communityId}/state`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store", signal: controller.signal });
+        const response = await fetch(`/api/overlay/${communityId}/state`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+          signal: controller.signal,
+        });
         if (!response.ok) throw new Error("Overlay unavailable");
-        const { data } = await response.json() as { data: { revision: number; card: OverlayCard | null } };
+        const { data } = (await response.json()) as {
+          data: { revision: number; card: OverlayCard | null };
+        };
         if (!stopped && data.revision >= revision.current) {
           revision.current = data.revision;
           lastSuccess.current = Date.now();
           setCard(data.card);
         }
-      } catch { if (!stopped) setCard(null); }
-      finally { clearTimeout(timeout); pending = false; }
+      } catch {
+        if (!stopped) setCard(null);
+      } finally {
+        clearTimeout(timeout);
+        pending = false;
+      }
     }
     void poll();
     const polling = setInterval(() => void poll(), 1000);
-    const freshness = setInterval(() => { if (Date.now() - lastSuccess.current > 3000) setCard(null); }, 250);
-    return () => { stopped = true; controller?.abort(); clearInterval(polling); clearInterval(freshness); };
+    const freshness = setInterval(() => {
+      if (Date.now() - lastSuccess.current > 3000) setCard(null);
+    }, 250);
+    return () => {
+      stopped = true;
+      controller?.abort();
+      clearInterval(polling);
+      clearInterval(freshness);
+    };
   }, [communityId]);
   if (!card) return null;
-  return <div className="overlay-card" key={card.id}>
-    <div className="overlay-eyebrow">SINCE LAST TIME <span>✦</span> {card.communityName}</div>
-    <div className="overlay-person">{card.author.avatarUrl ? <img src={card.author.avatarUrl} alt="" /> : <span>{card.author.displayName.slice(0, 1)}</span>}<strong>{card.author.displayName}</strong><span className="overlay-emoji">{card.emoji}</span></div>
-    {card.previous && <p className="overlay-previous">Last time: {card.previous.body}</p>}
-    <p className="overlay-body">{card.body}</p>
-    <style>{`body{background:transparent!important}.overlay-card{position:fixed;left:64px;bottom:80px;width:700px;padding:30px 34px;background:rgba(23,22,30,.96);border:1px solid #51425f;border-radius:24px;box-shadow:0 18px 70px #0005;color:#f7f2fb;font-family:Arial,sans-serif}.overlay-eyebrow{display:flex;gap:12px;align-items:center;font-size:11px;letter-spacing:2px;color:#c5b1df;margin-bottom:24px}.overlay-eyebrow span{color:#edd39b}.overlay-person{display:flex;align-items:center;gap:14px;font-size:22px}.overlay-person img,.overlay-person>span:first-child{width:48px;height:48px;border-radius:50%;background:#60466c;display:grid;place-items:center}.overlay-emoji{margin-left:auto;font-size:36px}.overlay-body{font-size:29px;line-height:1.45;margin:22px 0 0;overflow-wrap:anywhere}.overlay-previous{padding:12px 16px;border-left:2px solid #ad8cd2;color:#b6aabd;font-size:17px;line-height:1.5;margin:22px 0 0}`}</style>
-  </div>;
+  return (
+    <div className="overlay-card" key={card.id}>
+      <div className="overlay-eyebrow">
+        SINCE LAST TIME <span>✦</span> {card.communityName}
+      </div>
+      <div className="overlay-person">
+        {card.author.avatarUrl ? (
+          <img src={card.author.avatarUrl} alt="" />
+        ) : (
+          <span>{card.author.displayName.slice(0, 1)}</span>
+        )}
+        <strong>{card.author.displayName}</strong>
+        <span className="overlay-emoji">{card.emoji}</span>
+      </div>
+      {card.previous && <p className="overlay-previous">Last time: {card.previous.body}</p>}
+      <p className="overlay-body">{card.body}</p>
+      <style>{`body{background:transparent!important}.overlay-card{position:fixed;left:64px;bottom:80px;width:700px;padding:30px 34px;background:rgba(23,22,30,.96);border:1px solid #51425f;border-radius:24px;box-shadow:0 18px 70px #0005;color:#f7f2fb;font-family:Arial,sans-serif}.overlay-eyebrow{display:flex;gap:12px;align-items:center;font-size:11px;letter-spacing:2px;color:#c5b1df;margin-bottom:24px}.overlay-eyebrow span{color:#edd39b}.overlay-person{display:flex;align-items:center;gap:14px;font-size:22px}.overlay-person img,.overlay-person>span:first-child{width:48px;height:48px;border-radius:50%;background:#60466c;display:grid;place-items:center}.overlay-emoji{margin-left:auto;font-size:36px}.overlay-body{font-size:29px;line-height:1.45;margin:22px 0 0;overflow-wrap:anywhere}.overlay-previous{padding:12px 16px;border-left:2px solid #ad8cd2;color:#b6aabd;font-size:17px;line-height:1.5;margin:22px 0 0}`}</style>
+    </div>
+  );
 }

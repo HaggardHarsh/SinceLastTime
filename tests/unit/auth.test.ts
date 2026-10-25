@@ -28,7 +28,14 @@ describe("authentication boundaries", () => {
     expect(safeEqual(token, token + "x")).toBe(false);
   });
 
-  it.each(["https://example.com", "//example.com", "/\\example.com", "/\t/example.com", "/\n/example.com", null])("rejects unsafe return destination %s", (destination) => {
+  it.each([
+    "https://example.com",
+    "//example.com",
+    "/\\example.com",
+    "/\t/example.com",
+    "/\n/example.com",
+    null,
+  ])("rejects unsafe return destination %s", (destination) => {
     expect(safeReturnTo(destination)).toBe("/communities");
   });
 
@@ -37,7 +44,21 @@ describe("authentication boundaries", () => {
   });
 
   it("requires same-origin JSON mutations", () => {
-    expect(() => requireSameOrigin(new Request("http://localhost:3000/api/communities", { method: "POST", headers: { origin: "https://elsewhere.example", "content-type": "application/json" } }))).toThrow();
-    expect(() => requireSameOrigin(new Request("http://localhost:3000/api/communities", { method: "POST", headers: { origin: "http://localhost:3000", "content-type": "application/json" } }))).not.toThrow();
+    expect(() =>
+      requireSameOrigin(
+        new Request("http://localhost:3000/api/communities", {
+          method: "POST",
+          headers: { origin: "https://elsewhere.example", "content-type": "application/json" },
+        }),
+      ),
+    ).toThrow();
+    expect(() =>
+      requireSameOrigin(
+        new Request("http://localhost:3000/api/communities", {
+          method: "POST",
+          headers: { origin: "http://localhost:3000", "content-type": "application/json" },
+        }),
+      ),
+    ).not.toThrow();
   });
 });

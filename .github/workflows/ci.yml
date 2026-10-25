@@ -1,0 +1,56 @@
+name: SinceLastTime checks
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: sincelasttime
+          POSTGRES_PASSWORD: sincelasttime
+          POSTGRES_DB: sincelasttime_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U sincelasttime"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 15
+    env:
+      DATABASE_URL: postgresql://sincelasttime:sincelasttime@localhost:5432/sincelasttime_test
+      APP_BASE_URL: http://localhost:3000
+      DEMO_MODE: "true"
+      # Public test-only key. Production must generate its own random key.
+      TOKEN_ENCRYPTION_KEY: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run db:generate
+      - run: npm run db:migrate
+      - run: npm run db:seed
+      - run: npm run check
+      - run: npx playwright install --with-deps chromium
+      - run: npm run dev > /tmp/sincelasttime-dev.log 2>&1 &
+      - run: node scripts/wait-for-server.mjs
+      - run: npm run test:integration
+      - run: npm run test:e2e
+        env:
+          REUSE_TEST_SERVER: "true"
+      - run: pkill -f 'next dev' || true
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-failure-artifacts
+          path: |
+            test-results/
+            playwright-report/
+            /tmp/sincelasttime-dev.log

@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack --hostname 0.0.0.0",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && next build --webpack",
+    "prestart": "tsx scripts/check-config.ts",
     "start": "next start --hostname 0.0.0.0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -15,7 +16,8 @@
     "db:migrate": "prisma migrate deploy",
     "db:dev": "prisma migrate dev",
     "db:seed": "tsx scripts/seed.ts",
-    "worker": "tsx scripts/worker.ts"
+    "worker": "tsx scripts/worker.ts",
+    "check": "npm run typecheck && npm test"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.0.0",
@@ -39,6 +41,7 @@
     "@types/pg": "^8.15.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
+    "prettier": "^3.9.10",
     "prisma": "^7.0.0",
     "tailwindcss": "^4.1.0",
     "tsx": "^4.20.0",

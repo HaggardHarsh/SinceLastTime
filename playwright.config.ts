@@ -12,12 +12,15 @@ export default defineConfig({
     baseURL: process.env.TEST_BASE_URL ?? "http://localhost:3000",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
-    launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH, args: ["--no-sandbox"] },
+    launchOptions: {
+      executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+      args: ["--no-sandbox"],
+    },
   },
   webServer: {
     command: "npm run dev",
     url: `${process.env.TEST_BASE_URL ?? "http://localhost:3000"}/api/health`,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: !process.env.CI || process.env.REUSE_TEST_SERVER === "true",
     timeout: 120_000,
   },
 });

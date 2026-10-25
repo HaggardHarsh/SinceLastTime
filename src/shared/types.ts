@@ -1,5 +1,12 @@
 export type PublicUser = { id: string; login: string; displayName: string; avatarUrl: string };
-export type CommunityInfo = { id: string; slug: string; displayName: string; avatarUrl: string; description: string; prompt: string };
+export type CommunityInfo = {
+  id: string;
+  slug: string;
+  displayName: string;
+  avatarUrl: string;
+  description: string;
+  prompt: string;
+};
 export type EntryCard = {
   id: string;
   communityId: string;
@@ -26,6 +33,33 @@ export type EntryCard = {
   followUp: { id: string; state: string; dueAt: string } | null;
   hasPrevious: boolean;
 };
-export const CATEGORIES = ["Life update", "Small win", "Making something", "Question", "Anything else"] as const;
+export const CATEGORIES = [
+  "Life update",
+  "Small win",
+  "Making something",
+  "Question",
+  "Anything else",
+] as const;
 export const REACTIONS = ["❤️", "🎉", "🙌"] as const;
-export const EMOJIS = ["✨", "🎉", "🤞", "🌱", "🍞", "🐈", "🎮", "🎨", "☕", "📚", "🪡", "💜", "🌻", "🏡", "🎓", "🎵", "🐕", "🧶", "🚀", "💭"] as const;
+export const EMOJIS = [
+  "✨",
+  "🎉",
+  "🤞",
+  "🌱",
+  "🍞",
+  "🐈",
+  "🎮",
+  "🎨",
+  "☕",
+  "📚",
+  "🪡",
+  "💜",
+  "🌻",
+  "🏡",
+  "🎓",
+  "🎵",
+  "🐕",
+  "🧶",
+  "🚀",
+  "💭",
+] as const;

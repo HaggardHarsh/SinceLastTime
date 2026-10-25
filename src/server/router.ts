@@ -9,6 +9,8 @@ import { interactionRoutes } from "./interactions";
 import { moderationRoutes } from "./moderation";
 import { segmentRoutes } from "./segments";
 import { overlayRoutes } from "./overlay";
+import { followUpRoutes } from "./followups";
+import { db } from "./db";
 
 export type ApiRoute = {
   method: string;
@@ -24,6 +26,15 @@ const routes: ApiRoute[] = [
   ...moderationRoutes,
   ...segmentRoutes,
   ...overlayRoutes,
+  ...followUpRoutes,
+  { method: "GET", pattern: /^health$/, handle: async () => success({ ok: true }) },
+  { method: "GET", pattern: /^readiness$/, handle: async () => {
+    await db.$queryRaw`SELECT 1`;
+    const heartbeat = await db.workerHeartbeat.findUnique({ where: { name: "maintenance" } });
+    const workerHealthy = Boolean(heartbeat && Date.now() - heartbeat.lastSeenAt.getTime() < 180_000);
+    if (process.env.NODE_ENV === "production" && !workerHealthy) fail(503, "WORKER_UNAVAILABLE", "Background worker is starting.");
+    return success({ database: true, worker: workerHealthy });
+  } },
   { method: "GET", pattern: /^auth\/twitch$/, handle: startOAuth },
   { method: "GET", pattern: /^auth\/twitch\/callback$/, handle: finishOAuth },
   { method: "POST", pattern: /^auth\/logout$/, handle: logout },

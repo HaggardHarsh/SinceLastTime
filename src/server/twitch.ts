@@ -65,10 +65,10 @@ async function refreshAccount(userId: string, failedToken: string) {
   return refreshed ?? invalidateAccount(userId);
 }
 
-export async function validateAccount(userId: string) {
+export async function validateAccount(userId: string, force = false) {
   const account = await db.oAuthAccount.findUnique({ where: { userId } });
   if (!account) return invalidateAccount(userId);
-  if (Date.now() - account.validatedAt.getTime() < 55 * 60_000) return;
+  if (!force && Date.now() - account.validatedAt.getTime() < 55 * 60_000) return;
   const token = decrypt(account.accessTokenEnc);
   const validation = await validateToken(token);
   if (!validation) {

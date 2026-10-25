@@ -4,6 +4,7 @@ import { errorResponse, fail, success } from "./errors";
 import { demoMode } from "./config";
 import { communityRoutes } from "./community";
 import { statusRoutes } from "./statuses";
+import { storyRoutes } from "./stories";
 
 export type ApiRoute = {
   method: string;
@@ -14,6 +15,7 @@ export type ApiRoute = {
 const routes: ApiRoute[] = [
   ...communityRoutes,
   ...statusRoutes,
+  ...storyRoutes,
   { method: "GET", pattern: /^auth\/twitch$/, handle: startOAuth },
   { method: "GET", pattern: /^auth\/twitch\/callback$/, handle: finishOAuth },
   { method: "POST", pattern: /^auth\/logout$/, handle: logout },

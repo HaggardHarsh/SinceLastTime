@@ -35,7 +35,7 @@ export function errorResponse(error: unknown) {
   if (error instanceof ApiError) {
     ({ status, code, message, retryAfterSeconds } = error);
   } else if (error instanceof z.ZodError) {
-    status = 400; code = "INVALID_INPUT"; message = "Please check the highlighted fields.";
+    status = 400; code = "INVALID_INPUT"; message = error.issues[0]?.message ?? "Please check your update and try again.";
     fieldErrors = error.flatten().fieldErrors;
   } else if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2002") { status = 409; code = "CONFLICT"; message = "This action has already been completed. Refresh and try again."; }

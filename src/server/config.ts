@@ -17,7 +17,7 @@ export function assertProductionConfig() {
   if (process.env.NODE_ENV !== "production") return;
   demoMode();
   twitchConfig();
-  if (!process.env.DATABASE_URL || !process.env.TOKEN_ENCRYPTION_KEY || !baseUrl().startsWith("https://")) {
+  if (!process.env.DATABASE_URL || Buffer.from(process.env.TOKEN_ENCRYPTION_KEY ?? "", "base64").length !== 32 || !baseUrl().startsWith("https://")) {
     throw new Error("Production requires DATABASE_URL, TOKEN_ENCRYPTION_KEY, and an HTTPS APP_BASE_URL.");
   }
 }

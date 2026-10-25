@@ -20,6 +20,7 @@ export function entryInclude(communityId: string) {
     reply: { include: { author: { select: publicUser } } },
     discussions: { select: { id: true } },
     sourceFollowUp: true,
+    story: { select: { entries: { where: { visibility: "VISIBLE" as const, body: { not: null }, createdAt: { gt: new Date(Date.now() - HISTORY_LIFETIME) } }, select: { id: true, createdAt: true }, orderBy: { createdAt: "asc" as const }, take: 100 } } },
     resultFollowUps: { where: { state: "READY" as const }, select: { id: true, dueAt: true, sourceEntryId: true } },
   } satisfies Prisma.StatusEntryInclude;
 }
@@ -38,7 +39,7 @@ export function toCard(entry: IncludedEntry, viewerId: string): EntryCard {
     reportCount: entry.reports.length,
     reply: entry.reply ? { body: entry.reply.body, createdAt: entry.reply.createdAt.toISOString(), author: entry.reply.author } : null,
     followUp: entry.sourceFollowUp ? { id: entry.sourceFollowUp.id, state: entry.sourceFollowUp.state, dueAt: entry.sourceFollowUp.dueAt.toISOString() } : null,
-    hasPrevious: entry.resultFollowUps.length > 0,
+    hasPrevious: entry.story.entries.some((chapter) => chapter.createdAt < entry.createdAt),
   };
 }
 

@@ -17,7 +17,10 @@ export async function checkFollow(user: User, community: { id: string; broadcast
   if (community.ownerId === user.id) return true;
   if (!force && membership?.isFollower && membership.followCheckedAt && Date.now() - membership.followCheckedAt.getTime() < FOLLOW_CACHE_LIFETIME) return true;
   const follows = user.isDemo && demoMode() && community.broadcasterId.startsWith("demo-") ? user.login !== "visitor" : await followsChannel(user.id, community.broadcasterId);
-  if (membership) await db.membership.update({ where: { id: membership.id }, data: { isFollower: follows, followCheckedAt: new Date(), ...(!follows ? { state: "LEFT" } : {}) } });
+  if (membership) {
+    const updated = await db.membership.updateMany({ where: { id: membership.id, state: { not: "SUSPENDED" } }, data: { isFollower: follows, followCheckedAt: new Date(), ...(!follows ? { state: "LEFT" } : {}) } });
+    if (!updated.count) fail(403, "MEMBERSHIP_SUSPENDED", "Your access to this community is paused.");
+  }
   return follows;
 }
 
@@ -77,7 +80,12 @@ export const communityRoutes: ApiRoute[] = [
     if (!community) fail(404, "NOT_FOUND", "This community is unavailable.");
     await rateLimit(user.id, `join:${id}`, 10, 60_000);
     if (!(await checkFollow(user, community, true))) throw new ApiError(403, "FOLLOW_REQUIRED", "Follow this streamer on Twitch, then check again.");
-    const membership = await db.membership.upsert({ where: { communityId_userId: { communityId: id, userId: user.id } }, create: { communityId: id, userId: user.id, role: community.ownerId === user.id ? "OWNER" : "VIEWER", state: "ACTIVE", isFollower: true, followCheckedAt: new Date() }, update: { state: "ACTIVE", isFollower: true, followCheckedAt: new Date() } });
+    const membership = await db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Membership" WHERE "communityId" = ${id}::uuid AND "userId" = ${user.id}::uuid FOR UPDATE`;
+      const fresh = await tx.membership.findUnique({ where: { communityId_userId: { communityId: id, userId: user.id } } });
+      if (fresh?.state === "SUSPENDED") fail(403, "MEMBERSHIP_SUSPENDED", "Your access to this community is paused.");
+      return tx.membership.upsert({ where: { communityId_userId: { communityId: id, userId: user.id } }, create: { communityId: id, userId: user.id, role: community.ownerId === user.id ? "OWNER" : "VIEWER", state: "ACTIVE", isFollower: true, followCheckedAt: new Date() }, update: { state: "ACTIVE", isFollower: true, followCheckedAt: new Date() } });
+    });
     return success({ membership, community: metadata(community) });
   } },
   { method: "POST", pattern: /^communities\/([^/]+)\/recheck-follow$/, handle: async (request, [id]) => {

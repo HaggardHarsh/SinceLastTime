@@ -14,7 +14,7 @@ async function run() {
   do {
     try { await maintenance(new Date(), first); first = false; console.log(JSON.stringify({ event: "maintenance_completed" })); }
     catch (error) { console.error(JSON.stringify({ event: "maintenance_failed", name: error instanceof Error ? error.name : "UnknownError" })); }
-    if (!stopping) await new Promise<void>((resolve) => { const timer = setTimeout(resolve, 60_000); wake = () => { clearTimeout(timer); resolve(); }; });
+    if (!stopping && !process.argv.includes("--once")) await new Promise<void>((resolve) => { const timer = setTimeout(resolve, 60_000); wake = () => { clearTimeout(timer); resolve(); }; });
   } while (!stopping && !process.argv.includes("--once"));
 }
 run().finally(() => db.$disconnect());

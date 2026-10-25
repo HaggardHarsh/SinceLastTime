@@ -1,0 +1,332 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  OWNER
+  MODERATOR
+  VIEWER
+}
+enum MemberState {
+  ACTIVE
+  LEFT
+  SUSPENDED
+}
+enum Visibility {
+  VISIBLE
+  HIDDEN
+  DELETED
+}
+enum SegmentState {
+  DRAFT
+  LIVE
+  ENDED
+}
+enum QueueState {
+  PENDING
+  SHOWN
+  DISCUSSED
+  SKIPPED
+}
+enum FollowUpState {
+  SCHEDULED
+  READY
+  COMPLETED
+  DISMISSED
+  CANCELED
+}
+
+model User {
+  id             String @id @default(uuid()) @db.Uuid
+  twitchId       String @unique
+  login          String
+  displayName    String
+  avatarUrl      String
+  isDemo         Boolean @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  account        OAuthAccount?
+  sessions       AppSession[]
+  communities    Community[]
+  memberships    Membership[]
+  stories        Story[]
+  entries        StatusEntry[]
+  reactions      Reaction[]
+  votes          Vote[]
+  reports        Report[]
+  replies        StreamerReply[]
+  discussions    Discussion[]
+  notifications  Notification[]
+}
+
+model OAuthAccount {
+  userId          String @id @db.Uuid
+  accessTokenEnc  String
+  refreshTokenEnc String
+  expiresAt       DateTime
+  scopes          String[]
+  validatedAt     DateTime
+  updatedAt       DateTime @updatedAt
+  user            User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AppSession {
+  tokenHash String @id
+  userId    String @db.Uuid
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model OAuthAttempt {
+  stateHash String @id
+  returnTo  String
+  expiresAt DateTime
+}
+
+model Community {
+  id                  String @id @default(uuid()) @db.Uuid
+  broadcasterId       String @unique
+  ownerId             String @unique @db.Uuid
+  slug                String @unique
+  displayName         String
+  avatarUrl           String
+  description         String @default("A little space to catch up, celebrate the small things, and pick up where we left off.")
+  prompt              String @default("What’s happened since last time?")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  owner               User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  memberships         Membership[]
+  stories             Story[]
+  entries             StatusEntry[]
+  segments            Segment[]
+  followUps           FollowUp[]
+  notifications       Notification[]
+  overlayCredential   OverlayCredential?
+  overlay             OverlayState?
+  audits              AuditEvent[]
+}
+
+model Membership {
+  id                  String @id @default(uuid()) @db.Uuid
+  communityId         String @db.Uuid
+  userId              String @db.Uuid
+  role                Role @default(VIEWER)
+  state               MemberState @default(ACTIVE)
+  isFollower          Boolean @default(false)
+  followCheckedAt     DateTime?
+  currentEntryId      String? @unique @db.Uuid
+  discussionCount     Int @default(0)
+  lastDiscussedAt     DateTime?
+  joinedAt            DateTime @default(now())
+  community           Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  user                User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([communityId, userId])
+  @@index([communityId, state])
+}
+
+model Story {
+  id          String @id @default(uuid()) @db.Uuid
+  communityId String @db.Uuid
+  authorId    String @db.Uuid
+  createdAt   DateTime @default(now())
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  author      User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  entries     StatusEntry[]
+  @@unique([id, communityId, authorId])
+  @@index([communityId, authorId, createdAt])
+}
+
+model StatusEntry {
+  id              String @id @default(uuid()) @db.Uuid
+  communityId     String @db.Uuid
+  authorId        String @db.Uuid
+  storyId         String @db.Uuid
+  body            String?
+  emoji           String?
+  category        String @default("Life update")
+  allowOnStream   Boolean @default(false)
+  allowFollowUp   Boolean @default(false)
+  version         Int @default(1)
+  approvedVersion Int?
+  visibility      Visibility @default(VISIBLE)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  expiresAt       DateTime
+  deletedAt       DateTime?
+  purgedAt        DateTime?
+  community       Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  author          User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  story           Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  reactions       Reaction[]
+  votes           Vote[]
+  reports         Report[]
+  reply           StreamerReply?
+  queueItems      QueueItem[]
+  discussions     Discussion[]
+  sourceFollowUp  FollowUp? @relation("FollowUpSource")
+  resultFollowUps FollowUp[] @relation("FollowUpResult")
+  @@unique([id, communityId, authorId])
+  @@index([communityId, createdAt, id])
+  @@index([storyId, createdAt])
+  @@index([expiresAt])
+}
+
+model Reaction {
+  id        String @id @default(uuid()) @db.Uuid
+  entryId   String @db.Uuid
+  userId    String @db.Uuid
+  choice    String
+  entry     StatusEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([entryId, userId])
+}
+
+model Vote {
+  id      String @id @default(uuid()) @db.Uuid
+  entryId String @db.Uuid
+  userId  String @db.Uuid
+  entry   StatusEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  user    User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([entryId, userId])
+}
+
+model StreamerReply {
+  id        String @id @default(uuid()) @db.Uuid
+  entryId   String @unique @db.Uuid
+  authorId  String @db.Uuid
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  entry     StatusEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  author    User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+}
+
+model Report {
+  id           String @id @default(uuid()) @db.Uuid
+  entryId      String @db.Uuid
+  reporterId   String @db.Uuid
+  reason       String
+  resolvedAt   DateTime?
+  resolvedById String? @db.Uuid
+  createdAt    DateTime @default(now())
+  entry        StatusEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  reporter     User @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  @@unique([entryId, reporterId])
+  @@index([resolvedAt])
+}
+
+model Segment {
+  id          String @id @default(uuid()) @db.Uuid
+  communityId String @db.Uuid
+  state       SegmentState @default(DRAFT)
+  createdAt   DateTime @default(now())
+  startedAt   DateTime?
+  endedAt     DateTime?
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  queue       QueueItem[]
+  discussions Discussion[]
+  @@index([communityId, createdAt])
+}
+
+model QueueItem {
+  id           String @id @default(uuid()) @db.Uuid
+  segmentId    String @db.Uuid
+  entryId      String @db.Uuid
+  entryVersion Int
+  position     Int
+  reason       String
+  state        QueueState @default(PENDING)
+  segment      Segment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  entry        StatusEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  @@unique([segmentId, position])
+  @@unique([segmentId, entryId])
+}
+
+model Discussion {
+  id        String @id @default(uuid()) @db.Uuid
+  segmentId String @db.Uuid
+  entryId   String @db.Uuid
+  authorId  String @db.Uuid
+  createdAt DateTime @default(now())
+  segment   Segment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  entry     StatusEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  author    User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  @@unique([segmentId, authorId])
+  @@index([entryId])
+}
+
+model FollowUp {
+  id            String @id @default(uuid()) @db.Uuid
+  communityId   String @db.Uuid
+  sourceEntryId String @unique @db.Uuid
+  resultEntryId String? @db.Uuid
+  requestedById String @db.Uuid
+  dueAt         DateTime
+  state         FollowUpState @default(SCHEDULED)
+  noticeSentAt  DateTime?
+  createdAt     DateTime @default(now())
+  community     Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  sourceEntry   StatusEntry @relation("FollowUpSource", fields: [sourceEntryId], references: [id], onDelete: Cascade)
+  resultEntry   StatusEntry? @relation("FollowUpResult", fields: [resultEntryId], references: [id], onDelete: SetNull)
+  @@index([state, dueAt])
+}
+
+model Notification {
+  id               String @id @default(uuid()) @db.Uuid
+  userId           String @db.Uuid
+  communityId      String? @db.Uuid
+  type             String
+  referenceId      String @db.Uuid
+  deduplicationKey String @unique
+  createdAt        DateTime @default(now())
+  readAt           DateTime?
+  user             User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  community        Community? @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  @@index([userId, createdAt])
+}
+
+model OverlayCredential {
+  communityId String @id @db.Uuid
+  tokenHash   String @unique
+  rotatedAt   DateTime @default(now())
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+}
+
+model OverlayState {
+  communityId   String @id @db.Uuid
+  entryId       String? @db.Uuid
+  entryVersion  Int?
+  contextEntryId String? @db.Uuid
+  revision      Int @default(0)
+  community     Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+}
+
+model AuditEvent {
+  id          String @id @default(uuid()) @db.Uuid
+  communityId String @db.Uuid
+  actorId     String @db.Uuid
+  action      String
+  targetId    String
+  createdAt   DateTime @default(now())
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  @@index([communityId, createdAt])
+}
+
+model RateLimitBucket {
+  key       String @id
+  count     Int @default(1)
+  expiresAt DateTime
+  @@index([expiresAt])
+}
+
+model WorkerHeartbeat {
+  name       String @id
+  lastSeenAt DateTime
+}

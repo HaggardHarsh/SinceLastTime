@@ -125,7 +125,7 @@ export function Communities() {
                   method: "POST",
                   body: { displayName: name },
                 });
-                router.push(`/c/${community.slug}`);
+                router.push(`/c/${community.slug}/setup`);
                 setCreating(false);
               }, "Your community has a new home.");
             }}

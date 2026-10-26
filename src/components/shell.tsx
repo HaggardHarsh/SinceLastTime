@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -36,6 +36,17 @@ export function AppShell({
   const [accountOpen, setAccountOpen] = useState(false);
   const queryClient = useQueryClient();
   const pathname = usePathname();
+  const [signinMessage, setSigninMessage] = useState<string | null>(null);
+  useEffect(() => {
+    const messages: Record<string, string> = {
+      canceled: "Twitch sign-in was canceled. You can try again whenever you’re ready.",
+      expired: "Your sign-in link expired. Connect with Twitch again to continue.",
+      unavailable: "Twitch sign-in is temporarily unavailable. Please try again shortly.",
+    };
+    setSigninMessage(
+      messages[new URLSearchParams(window.location.search).get("signin") ?? ""] ?? null,
+    );
+  }, [pathname]);
   const user = session.data?.user;
   const { run, pending } = useAction();
   const communities = useQuery({
@@ -227,6 +238,11 @@ export function AppShell({
           </div>
         ) : !user ? (
           <main className="signin-state">
+            {signinMessage && (
+              <p className="notice" role="status">
+                {signinMessage}
+              </p>
+            )}
             <span className="eyebrow">YOUR PEOPLE ARE HERE</span>
             <h1>{community ? `Join ${community.displayName}.` : "Pick up the conversation."}</h1>
             <p>

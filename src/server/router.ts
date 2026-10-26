@@ -15,6 +15,7 @@ import { ownedStatusRoutes } from "./owned-statuses";
 import { candidateRoutes } from "./candidates";
 import { acknowledgementRoutes } from "./acknowledgements";
 import { briefingRoutes } from "./briefing";
+import { setupRoutes } from "./setup";
 
 export type ApiRoute = {
   method: string;
@@ -27,6 +28,7 @@ const routes: ApiRoute[] = [
   ...candidateRoutes,
   ...acknowledgementRoutes,
   ...briefingRoutes,
+  ...setupRoutes,
   ...communityRoutes,
   ...statusRoutes,
   ...storyRoutes,

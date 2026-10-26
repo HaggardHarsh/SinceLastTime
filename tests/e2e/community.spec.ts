@@ -121,6 +121,12 @@ test("the streamer prepares, reviews, presents, discusses, and schedules a follo
   await overlay.goto(url);
   await expect(overlay.locator(".overlay-body")).toHaveText(updateText);
   await expect(overlay.locator(".demo-bar")).toHaveCount(0);
+  await expect(page.getByText("Selected for overlay", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Clear overlay", exact: true }).click();
+  await expect(overlay.locator(".overlay-card")).toHaveCount(0);
+  await expect(page.getByText(/Previously shown · overlay cleared/)).toBeVisible();
+  await page.getByRole("button", { name: "Show on stream", exact: true }).click();
+  await expect(overlay.locator(".overlay-body")).toHaveText(updateText);
   await page.getByRole("button", { name: "Mark discussed", exact: true }).click();
   await expect(overlay.locator(".overlay-card")).toHaveCount(0);
   const follow = page.getByRole("dialog");

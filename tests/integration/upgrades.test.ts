@@ -406,4 +406,52 @@ suite("ownership, lifecycle, and community upgrades", () => {
       await f.cleanup();
     }
   });
+  it("keeps setup owner-only and separates public sharing tools from overlay credentials", async () => {
+    const f = await fixture();
+    try {
+      expect((await call(`communities/${f.communityId}/setup`, f.viewer)).status).toBe(403);
+      expect((await call(`communities/${f.communityId}/share-kit`, f.viewer)).status).toBe(403);
+      const kit = await call<{ communityUrl: string; panelImage: string; commandResponse: string }>(
+        `communities/${f.communityId}/share-kit`,
+        f.owner,
+      );
+      expect(new URL(kit.data.communityUrl).pathname).toBe(`/c/${f.slug}`);
+      expect(JSON.stringify(kit)).not.toContain("#token=");
+      expect(kit.data.commandResponse).toContain(kit.data.communityUrl);
+      expect(
+        (
+          await call(`communities/${f.communityId}/setup`, f.owner, "PATCH", {
+            step: "panelAdded",
+            completed: true,
+          })
+        ).status,
+      ).toBe(200);
+      expect(
+        (
+          await call<{ state: { panelAddedAt: string } }>(
+            `communities/${f.communityId}/setup`,
+            f.owner,
+          )
+        ).data.state.panelAddedAt,
+      ).toBeTruthy();
+      expect(
+        (
+          await call(`communities/${f.communityId}/setup`, f.owner, "PATCH", {
+            step: "panelAdded",
+            completed: false,
+          })
+        ).status,
+      ).toBe(200);
+      expect(
+        (
+          await call<{ state: { panelAddedAt: null } }>(
+            `communities/${f.communityId}/setup`,
+            f.owner,
+          )
+        ).data.state.panelAddedAt,
+      ).toBeNull();
+    } finally {
+      await f.cleanup();
+    }
+  });
 });

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="160" viewBox="0 0 320 160">
+  <rect width="320" height="160" rx="16" fill="#201c29"/>
+  <circle cx="300" cy="15" r="80" fill="#463252" opacity=".6"/>
+  <path d="M27 25h26a8 8 0 0 1 8 8v14a8 8 0 0 1-8 8H39l-12 8V33a8 8 0 0 1 8-8" fill="#b89bd5"/>
+  <path d="M37 35c3-4 7-3 8 0 2-3 6-4 8 0 3 5-3 9-8 13-5-4-11-8-8-13" fill="#292030"/>
+  <text x="75" y="47" font-family="Arial,sans-serif" font-size="23" font-weight="700" fill="#f5effa">SinceLastTime<tspan fill="#dbbf8d">.</tspan></text>
+  <text x="26" y="91" font-family="Arial,sans-serif" font-size="18" font-weight="700" fill="#f5effa">What’s new since last stream?</text>
+  <text x="26" y="118" font-family="Arial,sans-serif" font-size="13" fill="#c8bad4">Share an update with our community.</text>
+  <text x="26" y="141" font-family="Arial,sans-serif" font-size="11" fill="#b89bd5">THE CONVERSATION CONTINUES ↗</text>
+</svg>

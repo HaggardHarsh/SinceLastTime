@@ -139,6 +139,14 @@ export function Board({ slug }: { slug: string }) {
             <div className="board-layout">
               <section className="board-main" aria-label="Community updates">
                 <Composer communityId={community.id} />
+                {board.role === "OWNER" && (
+                  <p className="notice">
+                    Welcome your people with a community link, Twitch panel, and chat command.{" "}
+                    <Link className="text-button" href={`/c/${slug}/setup`}>
+                      Open setup & sharing tools ↗
+                    </Link>
+                  </p>
+                )}
                 <div className="feed-heading">
                   <h2>
                     The community board <span>{board.details.data?.statusCount ?? ""}</span>

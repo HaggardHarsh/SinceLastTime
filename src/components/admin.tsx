@@ -128,7 +128,13 @@ function Members({ communityId, owner }: { communityId: string; owner: boolean }
   );
 }
 
-function SettingsForm({ community }: { community: CommunityInfo }) {
+export function SettingsForm({
+  community,
+  onSaved,
+}: {
+  community: CommunityInfo;
+  onSaved?: () => Promise<unknown>;
+}) {
   const [displayName, setDisplayName] = useState(community.displayName);
   const [description, setDescription] = useState(community.description);
   const [prompt, setPrompt] = useState(community.prompt);
@@ -138,14 +144,13 @@ function SettingsForm({ community }: { community: CommunityInfo }) {
       className="admin-section settings-form"
       onSubmit={(event) => {
         event.preventDefault();
-        void run(
-          () =>
-            api(`communities/${community.id}`, {
-              method: "PATCH",
-              body: { displayName, description, prompt },
-            }),
-          "Your little space is updated.",
-        );
+        void run(async () => {
+          await api(`communities/${community.id}`, {
+            method: "PATCH",
+            body: { displayName, description, prompt },
+          });
+          await onSaved?.();
+        }, "Your little space is updated.");
       }}
     >
       <div className="admin-section-heading">
@@ -217,6 +222,13 @@ export function Settings({ slug }: { slug: string }) {
           </EmptyState>
         ) : (
           <div className="admin-stack">
+            <section className="admin-section">
+              <h2>Welcome your people.</h2>
+              <p>Reopen your setup checklist, share your link, and download the Twitch panel.</p>
+              <Link className="button button-secondary" href={`/c/${slug}/setup`}>
+                Open setup & sharing tools
+              </Link>
+            </section>
             <SettingsForm key={community.id} community={community} />
             <Members communityId={community.id} owner />
             <section className="admin-section overlay-settings">

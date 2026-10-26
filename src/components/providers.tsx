@@ -17,7 +17,7 @@ export function useSession() {
     queryKey: ["session"],
     queryFn: async () => {
       try {
-        return await api<{ user: PublicUser; demoMode: boolean }>("me");
+        return await api<{ user: PublicUser & { isDemo: boolean }; demoMode: boolean }>("me");
       } catch (error) {
         if (error instanceof ClientError && error.status === 401)
           return { user: null, demoMode: false };
@@ -50,37 +50,49 @@ export function useAction() {
 }
 
 function DemoBar() {
-  const [login, setLogin] = useState("maya");
+  const session = useSession();
+  const user = session.data?.user;
+  const identities = [
+    ["maya", "Maya · viewer"],
+    ["luna", "Luna · streamer"],
+    ["rohan", "Rohan · moderator"],
+    ["olive", "Olive · viewer"],
+    ["visitor", "Non-follower"],
+  ];
+  const login = user?.isDemo && identities.some(([id]) => id === user.login) ? user.login : "";
   const { pending, run } = useAction();
   return (
     <div className="demo-bar">
       <Sparkles size={13} />
       <span>Local demo</span>
       <span className="demo-hint">Explore the community as</span>
-      <select aria-label="Demo identity" value={login} onChange={(e) => setLogin(e.target.value)}>
-        {[
-          ["maya", "Maya · viewer"],
-          ["luna", "Luna · streamer"],
-          ["rohan", "Rohan · moderator"],
-          ["olive", "Olive · viewer"],
-          ["visitor", "Non-follower"],
-        ].map(([id, label]) => (
+      <select
+        aria-label="Demo identity"
+        value={login}
+        disabled={pending || session.isPending}
+        onChange={(event) => {
+          const nextLogin = event.target.value;
+          if (!nextLogin || nextLogin === login) return;
+          void run(async () => {
+            await api("auth/demo", { method: "POST", body: { login: nextLogin } });
+            window.location.assign("/c/luna");
+          });
+        }}
+      >
+        <option value="" disabled>
+          {session.isPending
+            ? "Loading…"
+            : user
+              ? `${user.displayName} · current account`
+              : "Choose a perspective…"}
+        </option>
+        {identities.map(([id, label]) => (
           <option key={id} value={id}>
             {label}
           </option>
         ))}
       </select>
-      <button
-        disabled={pending}
-        onClick={() =>
-          void run(async () => {
-            await api("auth/demo", { method: "POST", body: { login } });
-            window.location.assign("/c/luna");
-          })
-        }
-      >
-        {pending ? "Opening…" : "Enter demo →"}
-      </button>
+      <span role="status">{pending ? "Switching…" : "Switch perspective anytime"}</span>
     </div>
   );
 }

@@ -28,7 +28,12 @@ export function olderThan(cursor: ReturnType<typeof decodeCursor>) {
       }
     : {};
 }
-export const searchInput = z.string().trim().max(120).default("");
+export const searchInput = z
+  .string()
+  .trim()
+  .max(120)
+  .refine((value) => !value.includes("\0"), "Please remove invalid characters.")
+  .default("");
 export function literalSearch(value: string) {
   return value.replace(/[\\%_]/g, "\\$&");
 }

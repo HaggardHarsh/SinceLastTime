@@ -60,7 +60,7 @@ curl https://sincelasttime.yourdomain.com/api/health
 curl https://sincelasttime.yourdomain.com/api/readiness
 ```
 
-Both should return successful JSON. Readiness waits for a worker heartbeat and fails when it becomes stale.
+Both should return successful JSON. Readiness waits for separate maintenance and OAuth progress heartbeats and fails in production when either becomes stale. Inspect `overdueAccounts` to distinguish a Twitch verification backlog from content-maintenance health. Authentication still requires fresh verification when its cache expires.
 
 Use separate browser profiles for a manual Twitch check: sign in as the streamer and create a board, then sign in as a follower and join. Post an update, grant broadcast permission, prepare and approve a card, and show it through OBS. Withdraw permission in the viewer profile and confirm that it clears.
 
@@ -70,6 +70,9 @@ Use separate browser profiles for a manual Twitch check: sign in as the streamer
 - Keep web and worker on the same application version.
 - Preserve the encryption key and database together for recovery.
 - Watch the worker heartbeat, failed OAuth validation events, and database availability.
+- Watch both worker loop completion durations and counts. Maintenance processes at most 100 due invitations and 100 expired entries per pass; successive passes drain larger backlogs.
 - Generate a new OBS link when its access needs to be replaced.
 
 No EventSub webhook, public worker port, AI API key, or external email service is required for this release.
+
+For existing installations, follow the [0.2 upgrade notes](UPGRADE_0_2.md). Keep the SQL ownership constraints and partial indexes. Old unconfirmed queue versions need a fresh show before discussion completion. Public panel assets are included in the runtime image.

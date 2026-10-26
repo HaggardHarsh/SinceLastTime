@@ -42,9 +42,22 @@ export default function AboutPage() {
       </p>
       <h2>How do follow-ups work?</h2>
       <p>
-        You choose whether a streamer can send one in-app reminder about an update after discussing
-        it. You can dismiss a reminder or add a new chapter whenever you like. Posting never
-        guarantees a response or a place in a stream segment.
+        You choose whether a streamer can send one in-app reminder after acknowledging or discussing
+        your update. You can dismiss a reminder or add a new chapter whenever you like. Posting
+        never guarantees a response or a place in a stream segment.
+      </p>
+      <h2>Who sees an acknowledgement?</h2>
+      <p>
+        When the streamer deliberately acknowledges an update, only you and the streamer see that
+        receipt. Opening the board or briefing sends nothing. Written replies are visible to the
+        community. Editing your text requires a fresh acknowledgement; changing sharing permission
+        preserves the receipt.
+      </p>
+      <h2>Can I manage updates after leaving?</h2>
+      <p>
+        Sign in with the same Twitch account and open Your updates from the account menu. You can
+        delete retained posts and withdraw permission even when your community access is paused or
+        you no longer follow the streamer. Hidden posts remain manageable there too.
       </p>
       <h2>What does Twitch share?</h2>
       <p>

@@ -68,7 +68,11 @@ export async function startOAuth(request: Request) {
   try {
     configured = twitchConfig();
   } catch (error) {
-    if (error instanceof ApiError) return oauthFailure(returnTo, "unavailable");
+    if (error instanceof ApiError)
+      return oauthFailure(
+        returnTo,
+        error.code === "TWITCH_NOT_CONFIGURED" ? "unconfigured" : "unavailable",
+      );
     throw error;
   }
   const { clientId, redirectUri } = configured;
@@ -89,7 +93,10 @@ export async function startOAuth(request: Request) {
   return response;
 }
 
-export function oauthFailure(returnTo: string, reason: "canceled" | "expired" | "unavailable") {
+export function oauthFailure(
+  returnTo: string,
+  reason: "canceled" | "expired" | "unavailable" | "unconfigured",
+) {
   const destination = new URL(safeReturnTo(returnTo), baseUrl());
   destination.searchParams.set("signin", reason);
   const response = NextResponse.redirect(destination);

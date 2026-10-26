@@ -59,7 +59,7 @@ Entry cards include `contentVersion`. The `acknowledgement` property is omitted 
 
 ## Verification
 
-The release has 35 unit tests, 20 HTTP/PostgreSQL scenarios, and nine Chromium journeys. Concurrency tests pause real requests around transaction boundaries; worker tests hold external validation while actual database maintenance completes. Fresh-database and repeated migration checks verify the SQL safeguards.
+The release has 36 unit tests, 20 HTTP/PostgreSQL scenarios, and ten Chromium journeys. Concurrency tests pause real requests around transaction boundaries; worker tests hold external validation while actual database maintenance completes. Fresh-database and repeated migration checks verify the SQL safeguards.
 
 Browser coverage includes personal acknowledgements/follow-ups, exact briefing context, overlay clearing/review, cross-page search, panel download, persistent setup confirmations, and mobile author deletion/logout. Screenshots: [briefing](screenshots/briefing.png), [setup](screenshots/setup.png).
 

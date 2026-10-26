@@ -48,7 +48,7 @@ npm run db:seed
 npm run dev
 ```
 
-Open `http://localhost:3000`. The local demo bar switches between Maya (viewer), Luna (streamer), Rohan (moderator), Olive (viewer), and a non-follower. The seeded board is `/c/luna`.
+Open `http://localhost:3000`. On the sign-in screen, choose **Try viewer demo** or **Try streamer demo**; no Twitch credentials are needed for these sample identities. The local demo bar switches between Maya (viewer), Luna (streamer), Rohan (moderator), Olive (viewer), and a non-follower. The seeded board is `/c/luna`.
 
 Run the worker in a second terminal:
 
@@ -149,7 +149,7 @@ npm run test:e2e
 npm run build
 ```
 
-The suite includes 35 unit checks, twenty HTTP/PostgreSQL scenarios, and nine browser scenarios. Coverage includes controlled concurrent requests, author controls after suspension, private/version-specific receipts, community-only follow-ups, exact briefing context, search and selection beyond earlier limits, Twitch panel downloads, mobile logout, and actual overlay-page presentation. Integration files run serially because worker scenarios intentionally exercise database-wide maintenance.
+The suite includes 36 unit checks, twenty HTTP/PostgreSQL scenarios, and ten browser scenarios. Coverage includes controlled concurrent requests, author controls after suspension, private/version-specific receipts, community-only follow-ups, exact briefing context, search and selection beyond earlier limits, Twitch panel downloads, mobile logout, and actual overlay-page presentation. Integration files run serially because worker scenarios intentionally exercise database-wide maintenance.
 
 Integration tests create temporary demo users and communities and remove them afterward. Use a development/test database. CI runs against its own PostgreSQL service.
 

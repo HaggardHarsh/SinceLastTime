@@ -17,7 +17,7 @@ import {
   Video,
 } from "lucide-react";
 import { api } from "@/lib/api";
-import { useAction, useSession } from "./providers";
+import { useAction, useFeedback, useSession } from "./providers";
 import { Avatar, Brand, Dialog, ErrorState, LoadingState } from "./ui";
 import type { CommunityInfo } from "@/shared/types";
 
@@ -33,6 +33,7 @@ export function AppShell({
   active?: string;
 }) {
   const session = useSession();
+  const { demo } = useFeedback();
   const [accountOpen, setAccountOpen] = useState(false);
   const queryClient = useQueryClient();
   const pathname = usePathname();
@@ -41,12 +42,17 @@ export function AppShell({
     const messages: Record<string, string> = {
       canceled: "Twitch sign-in was canceled. You can try again whenever you’re ready.",
       expired: "Your sign-in link expired. Connect with Twitch again to continue.",
-      unavailable: "Twitch sign-in is temporarily unavailable. Please try again shortly.",
+      unavailable: demo
+        ? "Live Twitch sign-in is unavailable. You can explore the demo below."
+        : "Twitch sign-in is temporarily unavailable. Please try again shortly.",
+      unconfigured: demo
+        ? "Live Twitch sign-in hasn’t been connected for this preview. Try a demo below."
+        : "Twitch sign-in hasn’t been connected yet.",
     };
     setSigninMessage(
       messages[new URLSearchParams(window.location.search).get("signin") ?? ""] ?? null,
     );
-  }, [pathname]);
+  }, [pathname, demo]);
   const user = session.data?.user;
   const { run, pending } = useAction();
   const communities = useQuery({
@@ -246,16 +252,56 @@ export function AppShell({
             <span className="eyebrow">YOUR PEOPLE ARE HERE</span>
             <h1>{community ? `Join ${community.displayName}.` : "Pick up the conversation."}</h1>
             <p>
-              Sign in with Twitch to see what’s new in{" "}
-              {community ? "this community" : "your community"}.
+              {demo ? (
+                "Explore a sample community as a viewer or streamer."
+              ) : (
+                <>
+                  Sign in with Twitch to see what’s new in{" "}
+                  {community ? "this community" : "your community"}.
+                </>
+              )}
             </p>
+            {demo && (
+              <div className="signin-demo-actions">
+                <button
+                  className="button button-primary"
+                  disabled={pending}
+                  onClick={() =>
+                    void run(async () => {
+                      await api("auth/demo", { method: "POST", body: { login: "maya" } });
+                      queryClient.clear();
+                      window.location.assign("/c/luna");
+                    })
+                  }
+                >
+                  Try viewer demo
+                </button>
+                <button
+                  className="button button-secondary"
+                  disabled={pending}
+                  onClick={() =>
+                    void run(async () => {
+                      await api("auth/demo", { method: "POST", body: { login: "luna" } });
+                      queryClient.clear();
+                      window.location.assign("/c/luna/briefing");
+                    })
+                  }
+                >
+                  Try streamer demo
+                </button>
+              </div>
+            )}
             <a
-              className="button button-primary"
+              className={demo ? "text-button" : "button button-primary"}
               href={`/api/auth/twitch?returnTo=${encodeURIComponent(pathname)}`}
             >
-              Connect with Twitch
+              {demo ? "Connect a real Twitch account" : "Connect with Twitch"}
             </a>
-            <p className="fine-print">Community boards are open to verified followers.</p>
+            <p className="fine-print">
+              {demo
+                ? "Demo profiles use sample data. Twitch sign-in isn’t needed to explore."
+                : "Community boards are open to verified followers."}
+            </p>
           </main>
         ) : (
           children

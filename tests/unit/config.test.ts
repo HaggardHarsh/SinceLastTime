@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { assertProductionConfig } from "../../src/server/config";
+import { startOAuth } from "../../src/server/auth";
 
 describe("production configuration", () => {
   beforeEach(() => {
@@ -13,6 +14,15 @@ describe("production configuration", () => {
   afterEach(() => vi.unstubAllEnvs());
   it("accepts a complete HTTPS configuration", () =>
     expect(() => assertProductionConfig(true)).not.toThrow());
+  it("reports an unconfigured preview accurately without starting an OAuth request", async () => {
+    vi.stubEnv("TWITCH_CLIENT_SECRET", "");
+    const response = await startOAuth(
+      new Request("https://sincelasttime.example.com/api/auth/twitch?returnTo=%2Fc%2Fluna"),
+    );
+    const destination = new URL(response.headers.get("location")!);
+    expect(destination.pathname).toBe("/c/luna");
+    expect(destination.searchParams.get("signin")).toBe("unconfigured");
+  });
   it("refuses demo authentication in production even when invoked from npm prestart", () => {
     vi.stubEnv("DEMO_MODE", "true");
     expect(() => assertProductionConfig(true)).toThrow("Demo mode");

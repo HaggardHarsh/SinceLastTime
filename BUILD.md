@@ -37,9 +37,9 @@ The subsequent release implements the reviewed shortcomings and selected product
 
 ## Verification coverage
 
-- 35 unit checks across authentication, configuration, status validation, ranking, retention, pagination, concurrency, membership access, overlay eligibility, and the Twitch adapter.
+- 36 unit checks across authentication, configuration, status validation, ranking, retention, pagination, concurrency, membership access, overlay eligibility, and the Twitch adapter.
 - Twenty real HTTP/PostgreSQL scenarios covering author controls, privacy, controlled request interleavings, version checks, 520-entry selection, reminders, moderation, retention, independent worker jobs, setup, and sign-in error redirects.
-- Nine Chromium acceptance scenarios covering the viewer/streamer journey, private acknowledgement, community-only follow-ups, briefing context, actual overlay display/clearing, setup downloads, search beyond the first page, and mobile ownership/logout.
+- Ten Chromium acceptance scenarios covering the viewer/streamer journey, private acknowledgement, community-only follow-ups, briefing context, actual overlay display/clearing, setup downloads, search beyond the first page, and mobile ownership/logout.
 - Production compilation, configuration validation, and web/worker boot checks.
 
 Live Twitch authorization and a physical OBS broadcast require the deployer’s Twitch application credentials. The real integration and instructions are included; automated Twitch service responses use fixtures.

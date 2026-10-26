@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import {
   ArrowUpRight,
@@ -71,28 +71,30 @@ export function Board({ slug }: { slug: string }) {
   const board = useBoard(slug);
   const [category, setCategory] = useState("");
   const [search, setSearch] = useState("");
+  const [query, setQuery] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => setQuery(search.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
   const community = board.community;
   const feed = useInfiniteQuery({
-    queryKey: ["community", community?.id, "feed", category],
+    queryKey: ["community", community?.id, "feed", category, query],
     initialPageParam: null as string | null,
-    queryFn: ({ pageParam }) => {
+    queryFn: ({ pageParam, signal }) => {
       const params = new URLSearchParams();
       if (category) params.set("category", category);
       if (pageParam) params.set("cursor", pageParam);
+      if (query) params.set("q", query);
       return api<{ entries: EntryCard[]; nextCursor: string | null }>(
         `communities/${community!.id}/statuses?${params}`,
+        { signal },
       );
     },
     getNextPageParam: (last) => last.nextCursor,
     enabled: Boolean(community && board.joined),
     refetchInterval: 10_000,
   });
-  const entries =
-    feed.data?.pages
-      .flatMap((page) => page.entries)
-      .filter((entry) =>
-        `${entry.body} ${entry.author.displayName}`.toLowerCase().includes(search.toLowerCase()),
-      ) ?? [];
+  const entries = feed.data?.pages.flatMap((page) => page.entries) ?? [];
   const user = board.session.data?.user;
   return (
     <AppShell community={community} role={board.role}>
@@ -179,7 +181,7 @@ export function Board({ slug }: { slug: string }) {
                     ))}
                   </div>
                 ) : (
-                  <EmptyState title={search ? "No updates found" : "A new story starts here"}>
+                  <EmptyState title={query ? "No matching updates" : "A new story starts here"}>
                     {search
                       ? "Try another name or a different little detail."
                       : "Share the first little thing that’s happened since last time."}

@@ -11,6 +11,8 @@ import { segmentRoutes } from "./segments";
 import { overlayRoutes } from "./overlay";
 import { followUpRoutes } from "./followups";
 import { db } from "./db";
+import { ownedStatusRoutes } from "./owned-statuses";
+import { candidateRoutes } from "./candidates";
 
 export type ApiRoute = {
   method: string;
@@ -19,6 +21,8 @@ export type ApiRoute = {
 };
 
 const routes: ApiRoute[] = [
+  ...ownedStatusRoutes,
+  ...candidateRoutes,
   ...communityRoutes,
   ...statusRoutes,
   ...storyRoutes,

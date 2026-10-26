@@ -18,6 +18,7 @@ export type EntryCard = {
   createdAt: string;
   expiresAt: string;
   version: number;
+  contentVersion: number;
   approvedVersion: number | null;
   allowOnStream: boolean;
   allowFollowUp: boolean;
@@ -32,6 +33,11 @@ export type EntryCard = {
   reply: { body: string; createdAt: string; author: PublicUser } | null;
   followUp: { id: string; state: string; dueAt: string } | null;
   hasPrevious: boolean;
+  acknowledgement?: {
+    createdAt: string;
+    contentVersion: number;
+    streamer: { displayName: string };
+  } | null;
 };
 export const CATEGORIES = [
   "Life update",

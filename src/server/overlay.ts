@@ -9,6 +9,7 @@ import { hashToken, randomToken } from "./crypto";
 import { invalidatePresentation } from "./presentation";
 import { HISTORY_LIFETIME } from "./time";
 import type { ApiRoute } from "./router";
+import { lockEntry } from "./entry-locks";
 
 export function displayable(entry: IncludedEntry | null, current: boolean, now = new Date()) {
   if (
@@ -33,6 +34,48 @@ function presentation(entry: IncludedEntry) {
     body: entry.body,
     emoji: entry.emoji,
     author: { displayName: entry.author.displayName, avatarUrl: entry.author.avatarUrl },
+  };
+}
+
+export async function resolvePresentation(communityId: string) {
+  const state = await db.overlayState.findUnique({
+    where: { communityId },
+    include: { community: { select: { displayName: true } } },
+  });
+  const empty = { revision: state?.revision ?? 0, entryId: null, entryVersion: null, card: null };
+  if (!state?.entryId) return empty;
+  const [entry, live] = await Promise.all([
+    db.statusEntry.findUnique({ where: { id: state.entryId }, include: entryInclude(communityId) }),
+    db.segment.findFirst({ where: { communityId, state: "LIVE" }, select: { id: true } }),
+  ]);
+  if (
+    !live ||
+    !displayable(entry, true) ||
+    entry!.version !== state.entryVersion ||
+    entry!.communityId !== communityId
+  )
+    return empty;
+  const context = state.contextEntryId
+    ? await db.statusEntry.findUnique({
+        where: { id: state.contextEntryId },
+        include: entryInclude(communityId),
+      })
+    : null;
+  return {
+    revision: state.revision,
+    entryId: entry!.id,
+    entryVersion: entry!.version,
+    card: {
+      ...presentation(entry!),
+      communityName: state.community.displayName,
+      previous:
+        context &&
+        context.communityId === communityId &&
+        context.storyId === entry!.storyId &&
+        displayable(context, false)
+          ? presentation(context)
+          : null,
+    },
   };
 }
 
@@ -67,43 +110,7 @@ export const overlayRoutes: ApiRoute[] = [
       });
       if (!credential)
         fail(401, "OVERLAY_TOKEN_INVALID", "Generate a new overlay URL from the studio.");
-      const state = await db.overlayState.findUnique({
-        where: { communityId },
-        include: { community: { select: { displayName: true } } },
-      });
-      if (!state?.entryId) return success({ revision: state?.revision ?? 0, card: null });
-      const entry = await db.statusEntry.findUnique({
-        where: { id: state.entryId },
-        include: entryInclude(communityId),
-      });
-      const live = await db.segment.findFirst({
-        where: { communityId, state: "LIVE" },
-        select: { id: true },
-      });
-      if (
-        !live ||
-        !displayable(entry, true) ||
-        entry!.version !== state.entryVersion ||
-        entry!.communityId !== communityId
-      )
-        return success({ revision: state.revision, card: null });
-      const context = state.contextEntryId
-        ? await db.statusEntry.findUnique({
-            where: { id: state.contextEntryId },
-            include: entryInclude(communityId),
-          })
-        : null;
-      return success({
-        revision: state.revision,
-        card: {
-          ...presentation(entry!),
-          communityName: state.community.displayName,
-          previous:
-            context && context.storyId === entry!.storyId && displayable(context, false)
-              ? presentation(context)
-              : null,
-        },
-      });
+      return success(await resolvePresentation(communityId));
     },
   },
   {
@@ -123,7 +130,7 @@ export const overlayRoutes: ApiRoute[] = [
             where: { id: segmentId, communityId, state: "LIVE" },
           });
           if (!segment) fail(409, "SEGMENT_NOT_LIVE", "Start the conversation segment first.");
-          await tx.$queryRaw`SELECT id FROM "StatusEntry" WHERE id = ${entryId}::uuid FOR UPDATE`;
+          await lockEntry(tx, communityId, entryId);
           const item = await tx.queueItem.findUnique({
             where: { segmentId_entryId: { segmentId, entryId } },
           });
@@ -177,7 +184,10 @@ export const overlayRoutes: ApiRoute[] = [
               revision: { increment: 1 },
             },
           });
-          await tx.queueItem.update({ where: { id: item.id }, data: { state: "SHOWN" } });
+          await tx.queueItem.update({
+            where: { id: item.id },
+            data: { state: "SHOWN", shownVersion: entry.version },
+          });
           await tx.auditEvent.create({
             data: { communityId, actorId: user.id, action: "status.shown", targetId: entryId },
           });

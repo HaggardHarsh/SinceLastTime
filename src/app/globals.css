@@ -1,5 +1,39 @@
 @import "tailwindcss";
 
+.account-filter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  color: var(--muted);
+}
+.account-filter select {
+  max-width: 70%;
+  padding: 10px;
+  border: 1px solid #403c4b;
+  border-radius: 10px;
+  background: #24212b;
+  color: #eee8f4;
+}
+.account-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 20px;
+}
+.account-footnote {
+  margin-top: 28px;
+}
+.acknowledgement-receipt {
+  color: #c4b5d9;
+  font-size: 13px;
+  margin: 14px 0;
+}
+.danger-text {
+  color: #f0a2a9;
+}
+
 :root {
   color-scheme: dark;
   --background: #101015;

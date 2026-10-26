@@ -252,6 +252,7 @@ suite("real HTTP and PostgreSQL conversation workflow", () => {
       [1, 2].map(() =>
         call(`communities/${communityId}/segments/${segmentId}/discuss`, owner, "POST", {
           entryId: entry.id,
+          expectedVersion: entry.version,
         }),
       ),
     );
@@ -331,9 +332,9 @@ suite("real HTTP and PostgreSQL conversation workflow", () => {
       ).status,
     ).toBe(200);
     let state = (
-      await call<{ candidates: EntryCard[] }>(`communities/${communityId}/segments`, owner)
+      await call<{ entries: EntryCard[] }>(`communities/${communityId}/candidates`, owner)
     ).data;
-    expect(state.candidates.some((candidate) => candidate.id === entry.id)).toBe(false);
+    expect(state.entries.some((candidate) => candidate.id === entry.id)).toBe(false);
     await call(`communities/${communityId}/statuses/${entry.id}/review`, owner, "POST", {
       action: "hide",
       expectedVersion: entry.version,

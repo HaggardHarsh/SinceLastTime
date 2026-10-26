@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { usePathname } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Bell,
   ChevronRight,
@@ -17,7 +18,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAction, useSession } from "./providers";
-import { Avatar, Brand, ErrorState, LoadingState } from "./ui";
+import { Avatar, Brand, Dialog, ErrorState, LoadingState } from "./ui";
 import type { CommunityInfo } from "@/shared/types";
 
 export function AppShell({
@@ -32,6 +33,8 @@ export function AppShell({
   active?: string;
 }) {
   const session = useSession();
+  const [accountOpen, setAccountOpen] = useState(false);
+  const queryClient = useQueryClient();
   const pathname = usePathname();
   const user = session.data?.user;
   const { run, pending } = useAction();
@@ -97,6 +100,12 @@ export function AppShell({
           <Bell size={18} />
           Your catch-ups
         </Link>
+        <Link
+          className={`nav-link ${pathname === "/account/updates" ? "selected" : ""}`}
+          href="/account/updates"
+        >
+          <MessageCircle size={18} /> Your updates
+        </Link>
         <div className="nav-label community-nav-label">YOUR COMMUNITIES</div>
         {communities.data?.communities.map((c) => (
           <Link
@@ -147,6 +156,7 @@ export function AppShell({
                 onClick={() =>
                   void run(async () => {
                     await api("auth/logout", { method: "POST", body: {} });
+                    queryClient.clear();
                     window.location.assign("/");
                   })
                 }
@@ -174,7 +184,15 @@ export function AppShell({
             <Link className="icon-button" aria-label="Your catch-ups" href="/notifications">
               <Bell size={18} />
             </Link>
-            {user && <Avatar name={user.displayName} url={user.avatarUrl} size="sm" />}
+            {user && (
+              <button
+                className="icon-button"
+                aria-label="Account menu"
+                onClick={() => setAccountOpen(true)}
+              >
+                <Avatar name={user.displayName} url={user.avatarUrl} size="sm" />
+              </button>
+            )}
           </div>
         </header>
         <nav className="mobile-nav">
@@ -200,8 +218,11 @@ export function AppShell({
         ) : !user ? (
           <main className="signin-state">
             <span className="eyebrow">YOUR PEOPLE ARE HERE</span>
-            <h1>Pick up the conversation.</h1>
-            <p>Sign in with Twitch to see what’s new in your community.</p>
+            <h1>{community ? `Join ${community.displayName}.` : "Pick up the conversation."}</h1>
+            <p>
+              Sign in with Twitch to see what’s new in{" "}
+              {community ? "this community" : "your community"}.
+            </p>
             <a
               className="button button-primary"
               href={`/api/auth/twitch?returnTo=${encodeURIComponent(pathname)}`}
@@ -214,6 +235,40 @@ export function AppShell({
           children
         )}
       </div>
+      <Dialog open={accountOpen} title="Your account" onClose={() => setAccountOpen(false)}>
+        <div className="dialog-form">
+          <p>
+            Signed in as <strong>{user?.displayName}</strong>
+          </p>
+          <Link
+            className="button button-secondary"
+            href="/account/updates"
+            onClick={() => setAccountOpen(false)}
+          >
+            Your updates
+          </Link>
+          <Link
+            className="button button-secondary"
+            href="/communities"
+            onClick={() => setAccountOpen(false)}
+          >
+            My communities
+          </Link>
+          <button
+            className="button button-secondary"
+            disabled={pending}
+            onClick={() =>
+              void run(async () => {
+                await api("auth/logout", { method: "POST", body: {} });
+                queryClient.clear();
+                window.location.assign("/");
+              })
+            }
+          >
+            <LogOut size={16} /> Sign out
+          </button>
+        </div>
+      </Dialog>
     </div>
   );
 }

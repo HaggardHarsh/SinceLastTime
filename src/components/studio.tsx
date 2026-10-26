@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import {
   ArrowDown,
   ArrowUp,
@@ -32,14 +32,17 @@ import { Avatar, Dialog, EmptyState, ErrorState, LoadingState } from "./ui";
 type QueueItem = {
   id: string;
   entryVersion: number;
+  shownVersion: number | null;
+  entryId: string;
+  unavailableReason: string | null;
   position: number;
   reason: string;
   state: string;
-  entry: EntryCard;
+  entry: EntryCard | null;
 };
 type StudioState = {
   segment: { id: string; state: string; discussionCount: number; queue: QueueItem[] } | null;
-  candidates: EntryCard[];
+  overlay: { revision: number; entryId: string | null; entryVersion: number | null };
 };
 const reasons: Record<string, string> = {
   FIRST_TIME: "Hasn’t been featured yet",
@@ -66,10 +69,35 @@ export function Studio({ slug }: { slug: string }) {
   const [reply, setReply] = useState("");
   const [followEntry, setFollowEntry] = useState<EntryCard | null>(null);
   const [days, setDays] = useState(3);
+  const [candidateSearch, setCandidateSearch] = useState("");
   const { run, pending } = useAction();
   const { notify } = useFeedback();
   const segment = state.data?.segment;
-  const queue = segment?.queue ?? [];
+  const candidates = useInfiniteQuery({
+    queryKey: [
+      "community",
+      community?.id,
+      "candidates",
+      segment?.id,
+      candidateSearch,
+      board.session.data?.user?.id,
+    ],
+    initialPageParam: null as string | null,
+    enabled: Boolean(community && segment && staff && dialog === "add"),
+    queryFn: ({ pageParam, signal }) => {
+      const params = new URLSearchParams({ segmentId: segment!.id, q: candidateSearch });
+      if (pageParam) params.set("cursor", pageParam);
+      return api<{ entries: EntryCard[]; nextCursor: string | null }>(
+        `communities/${community!.id}/candidates?${params}`,
+        { signal },
+      );
+    },
+    getNextPageParam: (page) => page.nextCursor,
+  });
+  const queue = (segment?.queue ?? []).filter((item): item is QueueItem & { entry: EntryCard } =>
+    Boolean(item.entry),
+  );
+  const unavailable = segment?.queue.filter((item) => !item.entry) ?? [];
   const selected =
     queue.find((item) => item.entry.id === selectedId) ??
     queue.find((item) => item.state === "SHOWN" || item.state === "PENDING") ??
@@ -95,7 +123,7 @@ export function Studio({ slug }: { slug: string }) {
     new Date(entry.expiresAt).getTime() > Date.now() &&
     !entry.reportCount;
   const endpoint = `communities/${community?.id}/segments/${segment?.id}`;
-  async function saveQueue(items: QueueItem[]) {
+  async function saveQueue(items: (QueueItem & { entry: EntryCard })[]) {
     await api(`${endpoint}/queue`, {
       method: "PUT",
       body: { entries: items.map((item) => ({ id: item.entry.id, version: item.entry.version })) },
@@ -249,7 +277,7 @@ export function Studio({ slug }: { slug: string }) {
                           </strong>
                           <small>{reasons[item.reason] ?? item.reason}</small>
                         </span>
-                        {item.state === "SHOWN" && <Radio size={13} />}
+                        {state.data?.overlay.entryId === item.entry.id && <Radio size={13} />}
                       </button>
                       {segment.state === "DRAFT" && (
                         <div className="lineup-edit">
@@ -301,20 +329,40 @@ export function Studio({ slug }: { slug: string }) {
                 <div className="lineup-footnote">
                   <Sparkles size={15} />
                   <p>
-                    Everyone gets a turn. Votes help pick one card; the rest make room for different
-                    voices.
+                    We make room for different voices. Votes help pick one card. Selection is not
+                    guaranteed.
                   </p>
                 </div>
               </section>
               <section className="preview-panel">
+                {unavailable.length > 0 && (
+                  <div className="notice">
+                    {unavailable.length} queued{" "}
+                    {unavailable.length === 1 ? "update is" : "updates are"} unavailable. Their
+                    content is no longer shown here.
+                    {segment.state === "DRAFT" && (
+                      <button
+                        className="text-button"
+                        disabled={pending}
+                        onClick={() => void run(() => saveQueue(queue))}
+                      >
+                        Remove unavailable updates
+                      </button>
+                    )}
+                  </div>
+                )}
                 <div className="preview-heading">
                   <span className="eyebrow">
                     <Eye size={12} /> YOUR PRIVATE PREVIEW
                   </span>
                   <span>
-                    {entry && selected?.state === "SHOWN"
-                      ? "On the overlay now"
-                      : "Only you and your team can see this"}
+                    {entry &&
+                    state.data?.overlay.entryId === entry.id &&
+                    state.data.overlay.entryVersion === entry.version
+                      ? "Selected for overlay"
+                      : selected?.shownVersion
+                        ? "Previously shown · overlay cleared or another card selected"
+                        : "Only you and your team can see this"}
                   </span>
                 </div>
                 {!entry ? (
@@ -422,13 +470,16 @@ export function Studio({ slug }: { slug: string }) {
                           <button
                             className="button button-secondary"
                             disabled={
-                              pending || selected.state !== "SHOWN" || segment.state !== "LIVE"
+                              pending ||
+                              selected.state !== "SHOWN" ||
+                              selected.shownVersion !== entry.version ||
+                              segment.state !== "LIVE"
                             }
                             onClick={() =>
                               void run(async () => {
                                 await api(`${endpoint}/discuss`, {
                                   method: "POST",
-                                  body: { entryId: entry.id },
+                                  body: { entryId: entry.id, expectedVersion: entry.version },
                                 });
                                 if (entry.allowFollowUp && !entry.followUp) {
                                   setFollowEntry(entry);
@@ -563,7 +614,24 @@ export function Studio({ slug }: { slug: string }) {
           )}
           {dialog === "add" && (
             <div className="candidate-list">
-              {state.data?.candidates
+              <label>
+                Find an update
+                <input
+                  aria-label="Search lineup candidates"
+                  value={candidateSearch}
+                  onChange={(event) => setCandidateSearch(event.target.value)}
+                />
+              </label>
+              {candidates.isPending ? (
+                <LoadingState />
+              ) : candidates.error ? (
+                <ErrorState
+                  message={candidates.error.message}
+                  retry={() => void candidates.refetch()}
+                />
+              ) : null}
+              {candidates.data?.pages
+                .flatMap((page) => page.entries)
                 .filter(
                   (candidate) => !queue.some((q) => q.entry.author.id === candidate.author.id),
                 )
@@ -598,6 +666,15 @@ export function Studio({ slug }: { slug: string }) {
                     <Plus size={16} />
                   </button>
                 ))}
+              {candidates.hasNextPage && (
+                <button
+                  className="button button-secondary"
+                  disabled={candidates.isFetchingNextPage}
+                  onClick={() => void candidates.fetchNextPage()}
+                >
+                  More candidates
+                </button>
+              )}
             </div>
           )}
           {dialog === "reply" && entry && (

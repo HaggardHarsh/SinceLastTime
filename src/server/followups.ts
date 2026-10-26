@@ -33,7 +33,7 @@ export const followUpRoutes: ApiRoute[] = [
         );
       const followUp = await db.followUp.upsert({
         where: { sourceEntryId: entryId },
-        create: { communityId, sourceEntryId: entryId, requestedById: user.id, dueAt },
+        create: { communityId, sourceEntryId: entryId, sourceContentVersion: entry.contentVersion, requestedById: user.id, dueAt },
         update: {},
       });
       return success({ followUp });

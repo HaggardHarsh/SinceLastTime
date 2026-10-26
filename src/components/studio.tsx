@@ -698,6 +698,7 @@ export function Studio({ slug }: { slug: string }) {
                 }, "Your reply is shared.");
               }}
             >
+              <p>Your reply is visible to members of this community.</p>
               <label>
                 Your reply to {entry.author.displayName}
                 <textarea

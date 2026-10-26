@@ -2,7 +2,6 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { db } from "./db";
 import { access, uuid } from "./community";
-import { entryInclude, type IncludedEntry } from "./statuses";
 import { fail, parseBody, success } from "./errors";
 import { baseUrl } from "./config";
 import { hashToken, randomToken } from "./crypto";
@@ -11,7 +10,22 @@ import { HISTORY_LIFETIME } from "./time";
 import type { ApiRoute } from "./router";
 import { lockEntry } from "./entry-locks";
 
-export function displayable(entry: IncludedEntry | null, current: boolean, now = new Date()) {
+function overlayInclude(communityId: string) {
+  return {
+    author: {
+      select: {
+        displayName: true,
+        avatarUrl: true,
+        memberships: { where: { communityId }, select: { state: true, currentEntryId: true } },
+      },
+    },
+    reports: { where: { resolvedAt: null }, select: { id: true } },
+    discussions: { select: { id: true } },
+  } satisfies Prisma.StatusEntryInclude;
+}
+type OverlayEntry = Prisma.StatusEntryGetPayload<{ include: ReturnType<typeof overlayInclude> }>;
+
+export function displayable(entry: OverlayEntry | null, current: boolean, now = new Date()) {
   if (
     !entry ||
     !entry.body ||
@@ -28,7 +42,7 @@ export function displayable(entry: IncludedEntry | null, current: boolean, now =
   );
 }
 
-function presentation(entry: IncludedEntry) {
+function presentation(entry: OverlayEntry) {
   return {
     id: entry.id,
     body: entry.body,
@@ -45,7 +59,10 @@ export async function resolvePresentation(communityId: string) {
   const empty = { revision: state?.revision ?? 0, entryId: null, entryVersion: null, card: null };
   if (!state?.entryId) return empty;
   const [entry, live] = await Promise.all([
-    db.statusEntry.findUnique({ where: { id: state.entryId }, include: entryInclude(communityId) }),
+    db.statusEntry.findUnique({
+      where: { id: state.entryId },
+      include: overlayInclude(communityId),
+    }),
     db.segment.findFirst({ where: { communityId, state: "LIVE" }, select: { id: true } }),
   ]);
   if (
@@ -58,7 +75,7 @@ export async function resolvePresentation(communityId: string) {
   const context = state.contextEntryId
     ? await db.statusEntry.findUnique({
         where: { id: state.contextEntryId },
-        include: entryInclude(communityId),
+        include: overlayInclude(communityId),
       })
     : null;
   return {
@@ -136,7 +153,7 @@ export const overlayRoutes: ApiRoute[] = [
           });
           const entry = await tx.statusEntry.findFirst({
             where: { id: entryId, communityId },
-            include: entryInclude(communityId),
+            include: overlayInclude(communityId),
           });
           if (
             !item ||
@@ -163,7 +180,7 @@ export const overlayRoutes: ApiRoute[] = [
               storyId: entry.storyId,
               createdAt: { lt: entry.createdAt, gt: new Date(Date.now() - HISTORY_LIFETIME) },
             },
-            include: entryInclude(communityId),
+            include: overlayInclude(communityId),
             orderBy: { createdAt: "desc" },
             take: 20,
           });

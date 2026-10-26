@@ -67,6 +67,10 @@ export async function access(
   if (!(await checkFollow(user, community)))
     fail(403, "FOLLOW_REQUIRED", "Follow this streamer on Twitch to join their community.");
   membership = await db.membership.findUniqueOrThrow({ where: { id: membership.id } });
+  if (membership.state === "SUSPENDED")
+    fail(403, "MEMBERSHIP_SUSPENDED", "Your access to this community is paused.");
+  if (membership.state !== "ACTIVE")
+    fail(403, "JOIN_REQUIRED", "Join this community to see its updates.");
   if (level === "owner" && community.ownerId !== user.id)
     fail(403, "OWNER_REQUIRED", "Only the streamer can do that.");
   if (level === "moderator" && membership.role !== "OWNER" && membership.role !== "MODERATOR")
@@ -163,25 +167,18 @@ export const communityRoutes: ApiRoute[] = [
     pattern: /^communities\/([^/]+)$/,
     handle: async (request, [id]) => {
       const { community, membership } = await access(request, id);
-      const [memberCount, statusCount] = await Promise.all([
+      const [memberCount, statusRows] = await Promise.all([
         db.membership.count({ where: { communityId: id, state: "ACTIVE" } }),
-        db.statusEntry.count({
-          where: {
-            communityId: id,
-            visibility: "VISIBLE",
-            expiresAt: { gt: new Date() },
-            id: {
-              in: (
-                await db.membership.findMany({
-                  where: { communityId: id, state: "ACTIVE" },
-                  select: { currentEntryId: true },
-                })
-              ).flatMap((m) => (m.currentEntryId ? [m.currentEntryId] : [])),
-            },
-          },
-        }),
+        db.$queryRaw<{ count: number }[]>`SELECT COUNT(*)::int AS count FROM "Membership" m
+          JOIN "StatusEntry" e ON e.id = m."currentEntryId" AND e."communityId" = m."communityId" AND e."authorId" = m."userId"
+          WHERE m."communityId" = ${id}::uuid AND m.state = 'ACTIVE' AND e.visibility = 'VISIBLE' AND e.body IS NOT NULL AND e."expiresAt" > ${new Date()}`,
       ]);
-      return success({ community: metadata(community), membership, memberCount, statusCount });
+      return success({
+        community: metadata(community),
+        membership,
+        memberCount,
+        statusCount: statusRows[0].count,
+      });
     },
   },
   {

@@ -1,7 +1,8 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { db } from "../../src/server/db";
 import type { EntryCard } from "../../src/shared/types";
-import { call, fixture } from "./fixtures";
+import { call, fixture, base } from "./fixtures";
+import { hashToken, randomToken } from "../../src/server/crypto";
 const suite = process.env.INTEGRATION === "1" ? describe : describe.skip;
 suite("ownership, lifecycle, and community upgrades", () => {
   afterAll(() => db.$disconnect());
@@ -67,6 +68,20 @@ suite("ownership, lifecycle, and community upgrades", () => {
         unavailableReason: "EXPIRED",
       });
       expect(JSON.stringify(studio)).not.toContain("SENSITIVE_EXPIRED");
+      for (const path of [
+        `communities/${f.communityId}/statuses`,
+        `communities/${f.communityId}/stories/${entry.storyId}`,
+        `communities/${f.communityId}/members/${f.viewer.id}`,
+        `communities/${f.communityId}/briefing`,
+        `communities/${f.communityId}/moderation/statuses`,
+      ]) {
+        const response = await call(path, f.owner);
+        expect(response.status).toBe(200);
+        expect(JSON.stringify(response)).not.toContain("SENSITIVE_EXPIRED");
+      }
+      expect(JSON.stringify(await call("me/statuses", f.viewer))).not.toContain(
+        "SENSITIVE_EXPIRED",
+      );
       expect(
         (await call(`communities/${f.communityId}/statuses/${entry.id}`, f.viewer)).status,
       ).toBe(404);
@@ -450,6 +465,180 @@ suite("ownership, lifecycle, and community upgrades", () => {
           )
         ).data.state.panelAddedAt,
       ).toBeNull();
+    } finally {
+      await f.cleanup();
+    }
+  });
+  it("allows former members to revoke and delete their hidden posts through author controls", async () => {
+    const f = await fixture();
+    try {
+      const entry = (
+        await call<EntryCard>(`communities/${f.communityId}/statuses`, f.viewer, "POST", {
+          body: "A hidden update I still own",
+          allowOnStream: true,
+        })
+      ).data;
+      await call(`communities/${f.communityId}/statuses/${entry.id}/review`, f.owner, "POST", {
+        action: "hide",
+        expectedVersion: entry.version,
+      });
+      await db.membership.update({
+        where: { communityId_userId: { communityId: f.communityId, userId: f.viewer.id } },
+        data: { state: "LEFT" },
+      });
+      const owned = await call<{ entries: EntryCard[] }>("me/statuses", f.viewer);
+      expect(owned.data.entries[0].visibility).toBe("HIDDEN");
+      expect(
+        (
+          await call(`me/statuses/${entry.id}/preferences`, f.viewer, "PATCH", {
+            expectedVersion: owned.data.entries[0].version,
+            allowOnStream: false,
+          })
+        ).status,
+      ).toBe(200);
+      expect(
+        (
+          await call(`me/statuses/${entry.id}/preferences`, f.viewer, "PATCH", {
+            expectedVersion: owned.data.entries[0].version + 1,
+            allowOnStream: true,
+          })
+        ).status,
+      ).toBe(400);
+      expect(
+        (await call(`communities/${f.communityId}/statuses/${entry.id}`, f.viewer, "DELETE", {}))
+          .status,
+      ).toBe(200);
+      expect((await call(`communities/${f.communityId}/statuses`, f.viewer)).status).toBe(403);
+    } finally {
+      await f.cleanup();
+    }
+  });
+  it("keeps selected overlay state separate from history and requires a new show after an edit", async () => {
+    const f = await fixture();
+    try {
+      let entry = (
+        await call<EntryCard>(`communities/${f.communityId}/statuses`, f.viewer, "POST", {
+          body: "First presentation",
+          allowOnStream: true,
+        })
+      ).data;
+      const second = (
+        await call<EntryCard>(`communities/${f.communityId}/statuses`, f.peer, "POST", {
+          body: "Second person",
+          allowOnStream: true,
+        })
+      ).data;
+      const segment = (
+        await call<{ segment: { id: string } }>(
+          `communities/${f.communityId}/segments`,
+          f.owner,
+          "POST",
+          {},
+        )
+      ).data.segment;
+      const path = `communities/${f.communityId}/segments/${segment.id}`;
+      await call(`${path}/start`, f.owner, "POST", {});
+      await call(`communities/${f.communityId}/statuses/${entry.id}/review`, f.owner, "POST", {
+        action: "approve",
+        expectedVersion: entry.version,
+      });
+      await call(`${path}/show`, f.owner, "POST", {
+        entryId: entry.id,
+        expectedVersion: entry.version,
+      });
+      entry = (
+        await call<EntryCard>(
+          `communities/${f.communityId}/statuses/${entry.id}`,
+          f.viewer,
+          "PATCH",
+          { body: "A revised presentation", expectedVersion: entry.version },
+        )
+      ).data;
+      await call(`communities/${f.communityId}/statuses/${entry.id}/review`, f.owner, "POST", {
+        action: "approve",
+        expectedVersion: entry.version,
+      });
+      expect(
+        (
+          await call(`${path}/discuss`, f.owner, "POST", {
+            entryId: entry.id,
+            expectedVersion: entry.version,
+          })
+        ).error?.code,
+      ).toBe("SHOW_FIRST");
+      expect(
+        (
+          await call(`${path}/show`, f.owner, "POST", {
+            entryId: entry.id,
+            expectedVersion: entry.version,
+          })
+        ).status,
+      ).toBe(200);
+      await call(`communities/${f.communityId}/statuses/${second.id}/review`, f.owner, "POST", {
+        action: "approve",
+        expectedVersion: second.version,
+      });
+      await call(`${path}/show`, f.owner, "POST", {
+        entryId: second.id,
+        expectedVersion: second.version,
+      });
+      const studio = await call<{
+        overlay: { entryId: string | null };
+        segment: { queue: { entryId: string; state: string }[] };
+      }>(`communities/${f.communityId}/segments`, f.owner);
+      expect(studio.data.overlay.entryId).toBe(second.id);
+      expect(studio.data.segment.queue.find((item) => item.entryId === entry.id)?.state).toBe(
+        "SHOWN",
+      );
+      await call(`${path}/clear`, f.owner, "POST", {});
+      expect(
+        (
+          await call<{ overlay: { entryId: null } }>(
+            `communities/${f.communityId}/segments`,
+            f.owner,
+          )
+        ).data.overlay.entryId,
+      ).toBeNull();
+      expect(
+        (
+          await call(`${path}/discuss`, f.owner, "POST", {
+            entryId: entry.id,
+            expectedVersion: entry.version,
+          })
+        ).status,
+      ).toBe(200);
+    } finally {
+      await f.cleanup();
+    }
+  });
+  it("returns canceled and expired sign-ins to safe pages with readable error signals", async () => {
+    const f = await fixture();
+    try {
+      const state = randomToken();
+      await db.oAuthAttempt.create({
+        data: {
+          stateHash: hashToken(state),
+          returnTo: `/c/${f.slug}`,
+          expiresAt: new Date(Date.now() + 60000),
+        },
+      });
+      const canceled = await fetch(
+        `${base}/api/auth/twitch/callback?state=${state}&error=access_denied`,
+        { redirect: "manual", headers: { Cookie: `slt_oauth=${state}` } },
+      );
+      const destination = new URL(canceled.headers.get("location")!);
+      expect(destination.pathname).toBe(`/c/${f.slug}`);
+      expect(destination.searchParams.get("signin")).toBe("canceled");
+      expect(
+        await db.oAuthAttempt.findUnique({ where: { stateHash: hashToken(state) } }),
+      ).toBeNull();
+      const expired = await fetch(`${base}/api/auth/twitch/callback?state=invalid`, {
+        redirect: "manual",
+      });
+      const fallback = new URL(expired.headers.get("location")!);
+      expect(fallback.origin).toBe(new URL(base).origin);
+      expect(fallback.pathname).toBe("/communities");
+      expect(fallback.searchParams.get("signin")).toBe("expired");
     } finally {
       await f.cleanup();
     }

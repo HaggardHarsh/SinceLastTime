@@ -43,13 +43,32 @@ const routes: ApiRoute[] = [
     pattern: /^readiness$/,
     handle: async () => {
       await db.$queryRaw`SELECT 1`;
-      const heartbeat = await db.workerHeartbeat.findUnique({ where: { name: "maintenance" } });
-      const workerHealthy = Boolean(
-        heartbeat && Date.now() - heartbeat.lastSeenAt.getTime() < 180_000,
-      );
+      const heartbeats = await db.workerHeartbeat.findMany({
+        where: { name: { in: ["maintenance", "oauth"] } },
+      });
+      const healthy = (name: string) =>
+        heartbeats.some(
+          (heartbeat) =>
+            heartbeat.name === name && Date.now() - heartbeat.lastSeenAt.getTime() < 180_000,
+        );
+      const maintenance = healthy("maintenance"),
+        oauth = healthy("oauth");
+      const workerHealthy = maintenance && oauth;
       if (process.env.NODE_ENV === "production" && !workerHealthy)
         fail(503, "WORKER_UNAVAILABLE", "Background worker is starting.");
-      return success({ database: true, worker: workerHealthy });
+      const overdueAccounts = await db.oAuthAccount.count({
+        where: {
+          user: { sessions: { some: { expiresAt: { gt: new Date() } } } },
+          validatedAt: { lt: new Date(Date.now() - 60 * 60_000) },
+        },
+      });
+      return success({
+        database: true,
+        worker: workerHealthy,
+        maintenance,
+        oauth,
+        overdueAccounts,
+      });
     },
   },
   { method: "GET", pattern: /^auth\/twitch$/, handle: startOAuth },

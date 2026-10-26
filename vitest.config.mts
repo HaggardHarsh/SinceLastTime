@@ -6,6 +6,8 @@ export default defineConfig({
   test: {
     include: ["tests/unit/**/*.test.ts", "tests/integration/**/*.test.ts"],
     maxWorkers: 2,
+    // Worker scenarios intentionally exercise database-wide maintenance.
+    fileParallelism: process.env.INTEGRATION !== "1",
     testTimeout: 20_000,
   },
 });

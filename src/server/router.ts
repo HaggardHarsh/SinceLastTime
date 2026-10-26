@@ -13,6 +13,8 @@ import { followUpRoutes } from "./followups";
 import { db } from "./db";
 import { ownedStatusRoutes } from "./owned-statuses";
 import { candidateRoutes } from "./candidates";
+import { acknowledgementRoutes } from "./acknowledgements";
+import { briefingRoutes } from "./briefing";
 
 export type ApiRoute = {
   method: string;
@@ -23,6 +25,8 @@ export type ApiRoute = {
 const routes: ApiRoute[] = [
   ...ownedStatusRoutes,
   ...candidateRoutes,
+  ...acknowledgementRoutes,
+  ...briefingRoutes,
   ...communityRoutes,
   ...statusRoutes,
   ...storyRoutes,

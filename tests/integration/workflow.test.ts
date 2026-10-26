@@ -267,7 +267,7 @@ suite("real HTTP and PostgreSQL conversation workflow", () => {
         `communities/${communityId}/statuses/${entry.id}/follow-up`,
         owner,
         "POST",
-        { days: 1 },
+        { days: 1, expectedVersion: entry.version },
       )
     ).data.followUp.id;
     await db.followUp.update({

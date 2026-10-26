@@ -34,9 +34,10 @@ export function StatusCard({
   const active = entry.isCurrent && new Date(entry.expiresAt).getTime() > Date.now();
   const [menu, setMenu] = useState(false);
   const [mode, setMode] = useState<
-    "story" | "edit" | "update" | "consent" | "report" | "delete" | "reply" | null
+    "story" | "edit" | "update" | "consent" | "report" | "delete" | "reply" | "followup" | null
   >(null);
   const [reason, setReason] = useState("");
+  const [days, setDays] = useState(3);
   const [reply, setReply] = useState(entry.reply?.body ?? "");
   const { run, pending } = useAction();
   const story = useQuery({
@@ -59,7 +60,9 @@ export function StatusCard({
               ? "Let the community team know"
               : mode === "delete"
                 ? "Delete this update?"
-                : "A note from you";
+                : mode === "followup"
+                  ? "Invite a follow-up"
+                  : "Reply to the community";
   return (
     <article className={`status-card ${compact ? "status-card-compact" : ""}`}>
       <div className="status-heading">
@@ -137,6 +140,48 @@ export function StatusCard({
             </strong>
             <p>{entry.reply.body}</p>
           </div>
+        </div>
+      )}
+      {own && entry.acknowledgement && (
+        <p className="acknowledgement-receipt">
+          {entry.acknowledgement.streamer.displayName} read this update ·{" "}
+          {timeAgo(entry.acknowledgement.createdAt)}
+          <br />
+          <small>Only you and the streamer can see this acknowledgement.</small>
+        </p>
+      )}
+      {role === "OWNER" && !own && (
+        <div className="attention-actions">
+          {entry.acknowledgement ? (
+            <span className="acknowledgement-receipt">
+              <Check size={13} /> Acknowledged
+            </span>
+          ) : (
+            <button
+              className="text-button"
+              disabled={pending}
+              onClick={() =>
+                void run(
+                  () =>
+                    api(`communities/${entry.communityId}/statuses/${entry.id}/acknowledgement`, {
+                      method: "PUT",
+                      body: { expectedVersion: entry.version },
+                    }),
+                  "Acknowledged. Only this viewer can see your receipt.",
+                )
+              }
+            >
+              Acknowledge
+            </button>
+          )}
+          <button className="text-button" onClick={() => setMode("reply")}>
+            Reply to the community
+          </button>
+          {entry.allowFollowUp && (entry.acknowledgement || entry.discussed) && !entry.followUp && (
+            <button className="text-button" onClick={() => setMode("followup")}>
+              Invite a follow-up
+            </button>
+          )}
         </div>
       )}
       <div className="status-footer">
@@ -280,12 +325,13 @@ export function StatusCard({
               void run(async () => {
                 await api(`communities/${entry.communityId}/statuses/${entry.id}/reply`, {
                   method: "PUT",
-                  body: { body: reply },
+                  body: { body: reply, expectedVersion: entry.version },
                 });
                 close();
               }, "Your reply is shared.");
             }}
           >
+            <p>Your reply is visible to members of this community.</p>
             <label>
               Your reply
               <textarea
@@ -297,6 +343,40 @@ export function StatusCard({
             </label>
             <button className="button button-primary" disabled={pending}>
               Share your reply
+            </button>
+          </form>
+        )}
+        {mode === "followup" && (
+          <form
+            className="dialog-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void run(async () => {
+                await api(`communities/${entry.communityId}/statuses/${entry.id}/follow-up`, {
+                  method: "POST",
+                  body: { days, expectedVersion: entry.version },
+                });
+                close();
+              }, "Follow-up invitation scheduled.");
+            }}
+          >
+            <p>This viewer welcomed one in-app invitation to share what happened next.</p>
+            <label>
+              When should we check in?
+              <select
+                aria-label="Follow-up timing"
+                value={days}
+                onChange={(event) => setDays(Number(event.target.value))}
+              >
+                {[1, 3, 7, 14].map((day) => (
+                  <option key={day} value={day}>
+                    In {day} {day === 1 ? "day" : "days"}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button className="button button-primary" disabled={pending}>
+              Invite an update
             </button>
           </form>
         )}

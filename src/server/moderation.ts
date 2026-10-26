@@ -7,6 +7,8 @@ import { rateLimit } from "./http";
 import { invalidatePresentation } from "./presentation";
 import { HISTORY_LIFETIME } from "./time";
 import type { ApiRoute } from "./router";
+import { checkVersion, lockEntry, lockMember } from "./entry-locks";
+import { acknowledgeLocked } from "./acknowledgements";
 
 export const moderationRoutes: ApiRoute[] = [
   {
@@ -102,6 +104,8 @@ export const moderationRoutes: ApiRoute[] = [
           "Only visible updates with broadcast permission can be approved.",
         );
       await db.$transaction(async (tx) => {
+        const { entry: fresh } = await lockEntry(tx, communityId, id);
+        checkVersion(fresh.version, expectedVersion);
         const result = await tx.statusEntry.updateMany({
           where: { id, communityId, version: expectedVersion },
           data:
@@ -131,7 +135,10 @@ export const moderationRoutes: ApiRoute[] = [
           await invalidatePresentation(tx, communityId, id);
         if (action === "hide")
           await tx.followUp.updateMany({
-            where: { sourceEntryId: id, state: { in: ["SCHEDULED", "READY"] } },
+            where: {
+              OR: [{ sourceEntryId: id }, { resultEntryId: id }],
+              state: { in: ["SCHEDULED", "READY"] },
+            },
             data: { state: "CANCELED" },
           });
         await tx.auditEvent.create({
@@ -195,6 +202,14 @@ export const moderationRoutes: ApiRoute[] = [
       if (action === "set-role" && (!role || member.state !== "ACTIVE" || !member.isFollower))
         fail(400, "INVALID_ROLE", "Choose an active follower and a role.");
       await db.$transaction(async (tx) => {
+        const fresh = await lockMember(tx, communityId, userId);
+        if (
+          !fresh ||
+          fresh.role === "OWNER" ||
+          ((action === "set-role" || fresh.role === "MODERATOR") &&
+            actor.membership.role !== "OWNER")
+        )
+          fail(403, "PROTECTED_ROLE", "Community access has changed. Please refresh.");
         await tx.membership.update({
           where: { id: member.id },
           data:
@@ -234,23 +249,33 @@ export const moderationRoutes: ApiRoute[] = [
     pattern: /^communities\/([^/]+)\/statuses\/([^/]+)\/reply$/,
     handle: async (request, [communityId, id]) => {
       const { user } = await access(request, communityId, "owner");
-      const entry = await loadEntry(communityId, id);
-      const { body } = await parseBody(request, z.object({ body: statusInput.shape.body }));
-      const reply = await db.streamerReply.upsert({
-        where: { entryId: id },
-        create: { entryId: id, authorId: user.id, body },
-        update: { body },
-      });
-      await db.notification.upsert({
-        where: { deduplicationKey: `reply:${id}` },
-        create: {
-          userId: entry.authorId,
-          communityId,
-          type: "STREAMER_REPLY",
-          referenceId: entry.id,
-          deduplicationKey: `reply:${id}`,
-        },
-        update: {},
+      uuid.parse(id);
+      const { body, expectedVersion } = await parseBody(
+        request,
+        z.object({ body: statusInput.shape.body, expectedVersion: z.number().int().positive() }),
+      );
+      await rateLimit(user.id, `attention:${communityId}`, 60, 60_000);
+      const reply = await db.$transaction(async (tx) => {
+        const { entry } = await lockEntry(tx, communityId, id);
+        checkVersion(entry.version, expectedVersion);
+        await acknowledgeLocked(tx, entry, user.id, false);
+        const result = await tx.streamerReply.upsert({
+          where: { entryId: id },
+          create: { entryId: id, authorId: user.id, body },
+          update: { body },
+        });
+        await tx.notification.upsert({
+          where: { deduplicationKey: `reply:${id}:${entry.contentVersion}` },
+          create: {
+            userId: entry.authorId,
+            communityId,
+            type: "STREAMER_REPLY",
+            referenceId: entry.id,
+            deduplicationKey: `reply:${id}:${entry.contentVersion}`,
+          },
+          update: {},
+        });
+        return result;
       });
       return success({ reply });
     },

@@ -5,6 +5,9 @@ import { access, uuid } from "./community";
 import { entryInclude, loadEntry, toCard } from "./statuses";
 import { ApiError, fail, parseBody, success } from "./errors";
 import { DAY, HISTORY_LIFETIME } from "./time";
+import { checkVersion, lockEntry } from "./entry-locks";
+import { attentionAllowed } from "./acknowledgements";
+import { rateLimit } from "./http";
 import type { ApiRoute } from "./router";
 
 export const followUpRoutes: ApiRoute[] = [
@@ -13,28 +16,49 @@ export const followUpRoutes: ApiRoute[] = [
     pattern: /^communities\/([^/]+)\/statuses\/([^/]+)\/follow-up$/,
     handle: async (request, [communityId, entryId]) => {
       const { user } = await access(request, communityId, "owner");
-      const entry = await loadEntry(communityId, entryId);
-      const { days } = await parseBody(
+      uuid.parse(entryId);
+      const { days, expectedVersion } = await parseBody(
         request,
-        z.object({ days: z.number().int().min(1).max(14).default(3) }),
+        z.object({
+          days: z.number().int().min(1).max(14).default(3),
+          expectedVersion: z.number().int().positive(),
+        }),
       );
-      if (!entry.allowFollowUp || !entry.discussions.length)
-        fail(
-          409,
-          "FOLLOWUP_UNAVAILABLE",
-          "Follow-up reminders are available after a conversation when the viewer has opted in.",
-        );
-      const dueAt = new Date(Date.now() + days * DAY);
-      if (dueAt.getTime() >= entry.createdAt.getTime() + HISTORY_LIFETIME)
-        fail(
-          400,
-          "FOLLOWUP_TOO_LATE",
-          "This story is nearly finished. Invite a fresh update instead.",
-        );
-      const followUp = await db.followUp.upsert({
-        where: { sourceEntryId: entryId },
-        create: { communityId, sourceEntryId: entryId, sourceContentVersion: entry.contentVersion, requestedById: user.id, dueAt },
-        update: {},
+      await rateLimit(user.id, `attention:${communityId}`, 60, 60_000);
+      const followUp = await db.$transaction(async (tx) => {
+        const { entry } = await lockEntry(tx, communityId, entryId);
+        checkVersion(entry.version, expectedVersion);
+        await attentionAllowed(tx, entry);
+        const [acknowledgement, discussed] = await Promise.all([
+          tx.acknowledgement.findUnique({
+            where: { entryId_contentVersion: { entryId, contentVersion: entry.contentVersion } },
+          }),
+          tx.discussion.count({ where: { entryId } }),
+        ]);
+        if (!entry.allowFollowUp || (!acknowledgement && !discussed))
+          fail(
+            409,
+            "FOLLOWUP_UNAVAILABLE",
+            "Acknowledge this update first. Follow-ups also need the author’s permission.",
+          );
+        const dueAt = new Date(Date.now() + days * DAY);
+        if (dueAt.getTime() >= entry.createdAt.getTime() + HISTORY_LIFETIME)
+          fail(
+            400,
+            "FOLLOWUP_TOO_LATE",
+            "This story is nearly finished. Invite a fresh update instead.",
+          );
+        return tx.followUp.upsert({
+          where: { sourceEntryId: entryId },
+          create: {
+            communityId,
+            sourceEntryId: entryId,
+            sourceContentVersion: entry.contentVersion,
+            requestedById: user.id,
+            dueAt,
+          },
+          update: {},
+        });
       });
       return success({ followUp });
     },
@@ -87,6 +111,18 @@ export const followUpRoutes: ApiRoute[] = [
         }
         let entryId = row.referenceId;
         let followUpId: string | null = null;
+        let acknowledgedContentVersion: number | null = null;
+        if (row.type === "ACKNOWLEDGED") {
+          const receipt = await db.acknowledgement.findFirst({
+            where: {
+              id: row.referenceId,
+              entry: { authorId: user.id, communityId: row.communityId },
+            },
+          });
+          if (!receipt) continue;
+          entryId = receipt.entryId;
+          acknowledgedContentVersion = receipt.contentVersion;
+        }
         if (row.type === "FOLLOWUP_DUE" || row.type === "FOLLOWUP_READY") {
           const followUp = await db.followUp.findUnique({ where: { id: row.referenceId } });
           if (!followUp || ["CANCELED", "DISMISSED", "COMPLETED"].includes(followUp.state))
@@ -108,7 +144,12 @@ export const followUpRoutes: ApiRoute[] = [
           },
           include: entryInclude(row.communityId),
         });
-        if (!entry) continue;
+        if (
+          !entry ||
+          (acknowledgedContentVersion !== null &&
+            entry.contentVersion !== acknowledgedContentVersion)
+        )
+          continue;
         notifications.push({
           id: row.id,
           type: row.type,

@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import {
@@ -141,10 +143,15 @@ export function Studio({ slug }: { slug: string }) {
             <p>Five little updates. A few real conversations. Pick up where you left off.</p>
           </div>
           {owner && (
-            <button className="button button-secondary" onClick={() => setDialog("overlay")}>
-              <Monitor size={15} />
-              OBS setup
-            </button>
+            <div className="page-actions">
+              <Link className="button button-secondary" href={`/c/${slug}/briefing`}>
+                Before you go live
+              </Link>
+              <button className="button button-secondary" onClick={() => setDialog("overlay")}>
+                <Monitor size={15} />
+                OBS setup
+              </button>
+            </div>
           )}
         </div>
         {board.lookup.error || board.details.error || state.error ? (
@@ -685,7 +692,7 @@ export function Studio({ slug }: { slug: string }) {
                 void run(async () => {
                   await api(`communities/${community!.id}/statuses/${entry.id}/reply`, {
                     method: "PUT",
-                    body: { body: reply },
+                    body: { body: reply, expectedVersion: entry.version },
                   });
                   setDialog(null);
                 }, "Your reply is shared.");
@@ -713,7 +720,7 @@ export function Studio({ slug }: { slug: string }) {
                 void run(async () => {
                   await api(`communities/${community!.id}/statuses/${followEntry.id}/follow-up`, {
                     method: "POST",
-                    body: { days },
+                    body: { days, expectedVersion: followEntry.version },
                   });
                   setDialog(null);
                 }, "A little invitation to share what happens next.");

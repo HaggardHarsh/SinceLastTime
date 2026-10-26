@@ -21,6 +21,7 @@ type Notice = {
   entry: EntryCard;
 };
 const labels: Record<string, string> = {
+  ACKNOWLEDGED: "Your streamer read your update.",
   FOLLOWUP_DUE: "Any update on this?",
   FOLLOWUP_READY: "A story has a new chapter.",
   STREAMER_REPLY: "A little note from your streamer.",

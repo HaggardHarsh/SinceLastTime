@@ -71,6 +71,16 @@ export function AppShell({
         ...(role === "OWNER"
           ? [
               {
+                label: "Before you go live",
+                icon: Compass,
+                path: `/c/${community.slug}/briefing`,
+                key: "briefing",
+              },
+            ]
+          : []),
+        ...(role === "OWNER"
+          ? [
+              {
                 label: "Settings",
                 icon: Settings,
                 path: `/c/${community.slug}/settings`,

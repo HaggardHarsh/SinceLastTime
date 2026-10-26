@@ -22,6 +22,13 @@
   align-items: center;
   margin-top: 20px;
 }
+.attention-actions {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
 .account-footnote {
   margin-top: 28px;
 }
@@ -32,6 +39,47 @@
 }
 .danger-text {
   color: #f0a2a9;
+}
+.briefing-intro {
+  padding: 18px 22px;
+  border: 1px solid #454052;
+  border-radius: 16px;
+  margin-bottom: 24px;
+  background: #25212d;
+}
+.briefing-list {
+  display: grid;
+  gap: 24px;
+}
+.briefing-context {
+  border-left: 2px solid #aa8bc6;
+  padding: 12px 18px;
+  margin: 22px 0;
+  background: #272330;
+  border-radius: 0 10px 10px 0;
+}
+.briefing-context p {
+  margin-top: 10px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.briefing-current {
+  margin: 22px 0;
+}
+.briefing-current p {
+  font-size: 20px;
+  line-height: 1.6;
+  margin-top: 12px;
+  overflow-wrap: anywhere;
+}
+.briefing-card .status-heading {
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.page-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 :root {

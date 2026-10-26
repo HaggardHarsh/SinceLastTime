@@ -61,6 +61,7 @@ model User {
   replies        StreamerReply[]
   discussions    Discussion[]
   notifications  Notification[]
+  acknowledgements Acknowledgement[]
 }
 
 model OAuthAccount {
@@ -111,6 +112,7 @@ model Community {
   overlayCredential   OverlayCredential?
   overlay             OverlayState?
   audits              AuditEvent[]
+  setup               CommunitySetup?
 }
 
 model Membership {
@@ -124,6 +126,7 @@ model Membership {
   currentEntryId      String? @unique @db.Uuid
   discussionCount     Int @default(0)
   lastDiscussedAt     DateTime?
+  lastAcknowledgedAt  DateTime?
   joinedAt            DateTime @default(now())
   community           Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
   user                User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -154,6 +157,7 @@ model StatusEntry {
   allowOnStream   Boolean @default(false)
   allowFollowUp   Boolean @default(false)
   version         Int @default(1)
+  contentVersion  Int @default(1)
   approvedVersion Int?
   visibility      Visibility @default(VISIBLE)
   createdAt       DateTime @default(now())
@@ -172,6 +176,7 @@ model StatusEntry {
   discussions     Discussion[]
   sourceFollowUp  FollowUp? @relation("FollowUpSource")
   resultFollowUps FollowUp[] @relation("FollowUpResult")
+  acknowledgements Acknowledgement[]
   @@unique([id, communityId, authorId])
   @@index([communityId, createdAt, id])
   @@index([storyId, createdAt])
@@ -240,6 +245,7 @@ model QueueItem {
   segmentId    String @db.Uuid
   entryId      String @db.Uuid
   entryVersion Int
+  shownVersion Int?
   position     Int
   reason       String
   state        QueueState @default(PENDING)
@@ -266,6 +272,7 @@ model FollowUp {
   id            String @id @default(uuid()) @db.Uuid
   communityId   String @db.Uuid
   sourceEntryId String @unique @db.Uuid
+  sourceContentVersion Int @default(1)
   resultEntryId String? @db.Uuid
   requestedById String @db.Uuid
   dueAt         DateTime
@@ -329,4 +336,26 @@ model RateLimitBucket {
 model WorkerHeartbeat {
   name       String @id
   lastSeenAt DateTime
+}
+
+model Acknowledgement {
+  id             String @id @default(uuid()) @db.Uuid
+  entryId        String @db.Uuid
+  streamerId     String @db.Uuid
+  contentVersion Int
+  createdAt      DateTime @default(now())
+  entry          StatusEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  streamer       User @relation(fields: [streamerId], references: [id], onDelete: Cascade)
+  @@unique([entryId, contentVersion])
+  @@index([streamerId, createdAt])
+}
+
+model CommunitySetup {
+  communityId        String @id @db.Uuid
+  profileReviewedAt  DateTime?
+  panelAddedAt       DateTime?
+  chatCommandAddedAt DateTime?
+  overlayTestedAt    DateTime?
+  dismissedAt        DateTime?
+  community          Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
 }

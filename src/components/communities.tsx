@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowUpRight, Plus, Search, Users } from "lucide-react";
 import { api } from "@/lib/api";
 import type { CommunityInfo } from "@/shared/types";
+import { communitySearchTerm } from "@/shared/community-search";
 import { AppShell } from "./shell";
 import { useAction, useSession } from "./providers";
 import { Avatar, Dialog, EmptyState, ErrorState, LoadingState } from "./ui";
@@ -22,6 +23,21 @@ export function Communities() {
     enabled: Boolean(user),
   });
   const [search, setSearch] = useState("");
+  const [submittedSearch, setSubmittedSearch] = useState("");
+  const [searchError, setSearchError] = useState("");
+  const results = useQuery({
+    queryKey: ["community-search", submittedSearch],
+    queryFn: ({ signal }) =>
+      api<{ communities: CommunityInfo[]; hasMore: boolean }>(
+        `communities/search?q=${encodeURIComponent(submittedSearch)}`,
+        { signal },
+      ),
+    enabled: Boolean(user && submittedSearch),
+  });
+  const visibleCommunities: (CommunityInfo & { role?: string })[] = submittedSearch
+    ? (results.data?.communities ?? [])
+    : (query.data?.communities ?? []);
+  const activeQuery = submittedSearch ? results : query;
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const { run, pending } = useAction();
@@ -54,18 +70,19 @@ export function Communities() {
           className="community-find"
           onSubmit={(event) => {
             event.preventDefault();
-            let slug = search
-              .trim()
-              .replace(/^https?:\/\/(?:www\.)?twitch.tv\//, "")
-              .replace(/^.*\/c\//, "")
-              .split(/[/?#]/)[0];
-            if (/^[a-zA-Z0-9_]{1,25}$/.test(slug)) router.push(`/c/${slug.toLowerCase()}`);
+            const term = communitySearchTerm(search);
+            setSearchError(term ? "" : "Enter a community name, Twitch username, or board link.");
+            if (!term) return;
+            if (term === submittedSearch) void results.refetch();
+            else setSubmittedSearch(term);
           }}
         >
           <Search size={18} />
           <input
             aria-label="Find a community"
-            placeholder="Find a community by Twitch username or board link…"
+            placeholder="Community name, Twitch username, or board link…"
+            maxLength={300}
+            aria-describedby="community-search-help"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             required
@@ -75,13 +92,39 @@ export function Communities() {
             <ArrowUpRight size={14} />
           </button>
         </form>
-        {query.isPending ? (
+        <p id="community-search-help" className="fine-print">
+          Search boards created on SinceLastTime. A Twitch channel appears here after its streamer
+          creates a community.
+        </p>
+        {searchError && <p role="alert">{searchError}</p>}
+        {submittedSearch && (
+          <div className="page-heading">
+            <p role="status">
+              Results for “{submittedSearch}”
+              {results.data?.hasMore ? " · Showing 20 matches. Try a more specific name." : ""}
+            </p>
+            <button
+              className="button button-secondary"
+              onClick={() => {
+                setSubmittedSearch("");
+                setSearch("");
+                setSearchError("");
+              }}
+            >
+              Back to my communities
+            </button>
+          </div>
+        )}
+        {activeQuery.isPending ? (
           <LoadingState />
-        ) : query.error ? (
-          <ErrorState message={query.error.message} retry={() => void query.refetch()} />
-        ) : query.data?.communities.length ? (
+        ) : activeQuery.error ? (
+          <ErrorState
+            message={activeQuery.error.message}
+            retry={() => void activeQuery.refetch()}
+          />
+        ) : visibleCommunities.length ? (
           <div className="community-grid">
-            {query.data.communities.map((community) => (
+            {visibleCommunities.map((community) => (
               <Link className="community-tile" key={community.id} href={`/c/${community.slug}`}>
                 <div className="tile-art">
                   <span>✦</span>
@@ -94,7 +137,9 @@ export function Communities() {
                       ? "YOUR COMMUNITY"
                       : community.role === "MODERATOR"
                         ? "COMMUNITY TEAM"
-                        : "ONE OF YOUR LITTLE SPACES"}
+                        : submittedSearch
+                          ? `@${community.slug}`
+                          : "ONE OF YOUR LITTLE SPACES"}
                   </span>
                   <h2>{community.displayName}</h2>
                   <p>{community.description}</p>
@@ -106,6 +151,11 @@ export function Communities() {
               </Link>
             ))}
           </div>
+        ) : submittedSearch ? (
+          <EmptyState title="No matching boards yet">
+            Check the Twitch username or ask the streamer to create their SinceLastTime community.
+            If this is your channel, choose Create your community above.
+          </EmptyState>
         ) : (
           <EmptyState title="Find your first little space">
             Open a board shared by your streamer, or search for their Twitch username above.

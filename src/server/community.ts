@@ -8,6 +8,7 @@ import { followsChannel } from "./twitch";
 import { FOLLOW_CACHE_LIFETIME } from "./time";
 import { rateLimit } from "./http";
 import type { ApiRoute } from "./router";
+import { communitySearchTerm } from "@/shared/community-search";
 
 export const uuid = z.uuid();
 
@@ -98,6 +99,39 @@ const metadata = (community: {
 export const communityRoutes: ApiRoute[] = [
   {
     method: "GET",
+    pattern: /^communities\/search$/,
+    handle: async (request) => {
+      const user = await requireUser(request);
+      await rateLimit(user.id, "community-search", 60, 60_000);
+      const raw = z
+        .string()
+        .trim()
+        .min(1)
+        .max(300)
+        .parse(new URL(request.url).searchParams.get("q"));
+      const term = communitySearchTerm(raw);
+      if (!term)
+        fail(400, "INVALID_SEARCH", "Enter a community name, Twitch username, or board link.");
+      const literal = term.replace(/[\\%_]/g, "\\$&");
+      const communities = await db.community.findMany({
+        where: {
+          ...(!demoMode() ? { owner: { isDemo: false } } : {}),
+          OR: [
+            { slug: { contains: literal, mode: "insensitive" } },
+            { displayName: { contains: literal, mode: "insensitive" } },
+          ],
+        },
+        orderBy: [{ slug: "asc" }, { id: "asc" }],
+        take: 21,
+      });
+      return success({
+        communities: communities.slice(0, 20).map(metadata),
+        hasMore: communities.length > 20,
+      });
+    },
+  },
+  {
+    method: "GET",
     pattern: /^communities$/,
     handle: async (request) => {
       const user = await requireUser(request);
@@ -149,7 +183,12 @@ export const communityRoutes: ApiRoute[] = [
     pattern: /^communities\/lookup\/([^/]+)$/,
     handle: async (request, [slug]) => {
       const community = await db.community.findUnique({ where: { slug: slug.toLowerCase() } });
-      if (!community) fail(404, "NOT_FOUND", "We couldn’t find that community.");
+      if (!community)
+        fail(
+          404,
+          "NOT_FOUND",
+          "No SinceLastTime board exists for this username yet. The streamer needs to sign in and choose Create your community first.",
+        );
       const user = await currentUser(request);
       const membership = user
         ? await db.membership.findUnique({

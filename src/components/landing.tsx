@@ -1,17 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {
-  ArrowDown,
-  ArrowUpRight,
-  Check,
-  CornerDownRight,
-  Heart,
-  MessageCircleHeart,
-  Radio,
-  ShieldCheck,
-  Sparkles,
-} from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Check } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAction, useFeedback, useSession } from "./providers";
 import { Avatar, Brand } from "./ui";
@@ -21,43 +11,47 @@ export function Landing() {
   const { demo } = useFeedback();
   const { run, pending } = useAction();
   const destination = data?.user ? "/communities" : "/api/auth/twitch";
+  const primaryLabel = data?.user ? "Back to your people" : "Connect with Twitch";
+
   return (
-    <div className="landing">
-      <nav className="landing-nav">
+    <div className="landing ledger-page">
+      <nav className="ledger-nav" aria-label="Main navigation">
         <Brand />
-        <div>
+        <span className="ledger-edition">
+          A COMMUNITY LEDGER <span>·</span> NO. 01
+        </span>
+        <div className="ledger-nav-links">
           <a href="#how-it-works">How it works</a>
-          <Link href="/about">A little about us</Link>
+          <Link href="/about">About this space</Link>
         </div>
-        <a className="button button-secondary" href={destination}>
-          {data?.user ? "Your communities" : "Connect with Twitch"}
-          <ArrowUpRight size={14} />
+        <a className="button button-primary ledger-nav-action" href={destination}>
+          {primaryLabel} <ArrowUpRight size={15} />
         </a>
       </nav>
+
       <main>
-        <section className="landing-hero">
-          <div className="hero-copy">
-            <span className="eyebrow">
-              <span className="small-dot" /> FOR THE PEOPLE BEHIND THE USERNAMES
-            </span>
-            <h1>
-              Life happens.
-              <br />
-              <span>Let’s catch up.</span>
-              <span className="hero-star">✺</span>
-            </h1>
-            <p>
-              A little space for your Twitch community to share life’s updates, celebrate small
-              wins, and pick up the conversation next time.
+        <section className="ledger-opening">
+          <div className="ledger-intro">
+            <p className="ledger-kicker">
+              <span /> FOR THE PEOPLE BEHIND THE USERNAMES
             </p>
-            <div className="hero-actions">
+            <h1>
+              The story is
+              <br />
+              still <em>going.</em>
+            </h1>
+            <p className="ledger-deck">
+              A place for your Twitch community to share life between streams—and remember to ask
+              what happened next.
+            </p>
+            <div className="ledger-actions">
               <a className="button button-primary" href={destination}>
-                {data?.user ? "Back to your people" : "Find your little space"}
-                <ArrowUpRight size={17} />
+                {data?.user ? "Back to your people" : "Find your community"}
+                <ArrowUpRight size={16} />
               </a>
               {demo ? (
                 <button
-                  className="text-button"
+                  className="ledger-demo-link"
                   disabled={pending}
                   onClick={() =>
                     void run(async () => {
@@ -66,205 +60,203 @@ export function Landing() {
                     })
                   }
                 >
-                  Explore the local demo
-                  <ArrowUpRight size={14} />
+                  Read the local demo <ArrowUpRight size={14} />
                 </button>
               ) : (
-                <a className="text-button" href="#how-it-works">
-                  Take a little look
-                  <ArrowDown size={14} />
+                <a className="ledger-demo-link" href="#how-it-works">
+                  See how it works <ArrowDownRight size={14} />
                 </a>
               )}
             </div>
-            <div className="hero-fine">
-              <Heart size={12} />
-              <span>Because the little things are the big things.</span>
-            </div>
+            <p className="ledger-footnote">For the little things that make a life.</p>
           </div>
-          <div className="hero-story" aria-label="An illustrative community story">
-            <span className="hero-story-caption">A LITTLE STORY, JUST TO SHOW YOU HOW</span>
-            <div className="hero-card hero-card-before">
-              <div className="hero-person">
-                <Avatar name="Maya" size="sm" />
-                <strong>Maya</strong>
-                <span>last time</span>
-              </div>
-              <p>
-                First job interview tomorrow.
-                <br />
-                Wish me luck! <span>🤞</span>
-              </p>
-              <div className="hero-reactions">
-                <span>💜 12</span>
-                <span>🙌 8</span>
-              </div>
-            </div>
-            <span className="story-connection">
-              <CornerDownRight size={36} strokeWidth={1} />
-            </span>
-            <div className="hero-card hero-card-after">
-              <span className="hero-followup">
-                <Sparkles size={12} />
-                AND THEN WHAT HAPPENED?
+
+          <article className="ledger-feature" aria-label="Maya's story, then and now">
+            <header className="ledger-feature-head">
+              <span>THE CONVERSATION, CONTINUED</span>
+              <span>
+                01 <i>/</i> 03
               </span>
-              <div className="hero-person">
-                <Avatar name="Maya" size="sm" />
-                <strong>Maya</strong>
-                <span>since last time</span>
-              </div>
-              <p>
-                I got the job!
-                <br />
-                Starting Monday. <span>🥹</span>
-              </p>
-              <div className="hero-streamer-reply">
-                <Avatar name="Luna" size="xs" />
+            </header>
+            <div className="ledger-chapter ledger-chapter-before">
+              <div className="ledger-chapter-meta">
                 <span>
-                  <strong>Luna</strong> Maya!! We knew you could do it. 💜
+                  THEN <i>·</i> LAST STREAM
+                </span>
+                <span>
+                  <Avatar name="Maya" size="xs" /> MAYA
                 </span>
               </div>
+              <p>
+                First job interview tomorrow. Wish me luck! <span>🤞</span>
+              </p>
+              <small>12 people were rooting for her</small>
             </div>
-            <span className="floating-star star-one">✧</span>
-            <span className="floating-star star-two">✦</span>
-            <span className="floating-note">
-              a username.
-              <br />
-              <em>a whole little world.</em>
-            </span>
-          </div>
-        </section>
-        <div className="landing-divider">
-          <span>SHARED UPDATES</span>
-          <span>✦</span>
-          <span>REAL CONVERSATIONS</span>
-          <span>✦</span>
-          <span>A NEXT CHAPTER</span>
-        </div>
-        <section className="how-section" id="how-it-works">
-          <div className="section-intro">
-            <span className="eyebrow">A LITTLE MORE CONNECTED</span>
-            <h2>
-              The conversation doesn’t
-              <br />
-              have to start over.
-            </h2>
-            <p>
-              Let your community share a little of their world.
-              <br />
-              Make a little time to be part of it.
-            </p>
-          </div>
-          <div className="how-steps">
-            {[
-              {
-                n: "01",
-                icon: MessageCircleHeart,
-                title: "Share a little thing.",
-                body: "A life update, a tiny victory, a project you’re proud of. Your status belongs to this community, and this community alone.",
-              },
-              {
-                n: "02",
-                icon: Radio,
-                title: "Make a little time.",
-                body: "The streamer picks a fair mix of updates for a catch-up on stream. Different voices get their moment, and chat joins the conversation.",
-              },
-              {
-                n: "03",
-                icon: CornerDownRight,
-                title: "Keep the story going.",
-                body: "Add what happened next. A welcomed follow-up becomes the start of another conversation, with a little context from last time.",
-              },
-            ].map((step) => (
-              <article key={step.n}>
-                <div>
-                  <span>{step.n}</span>
-                  <step.icon size={29} strokeWidth={1.3} />
-                </div>
-                <h3>{step.title}</h3>
-                <p>{step.body}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-        <section className="streamer-section">
-          <div className="mini-studio">
-            <div className="mini-studio-heading">
-              <span>
-                <span className="small-dot" />
-                YOUR LITTLE LINEUP
-              </span>
-              <span>5 updates · a few good minutes</span>
+            <div className="ledger-turn" aria-hidden="true">
+              <span /> THEN, A WEEK LATER <ArrowDownRight size={16} />
             </div>
-            {[
-              ["Nina", "🐈", "Hasn’t been featured yet"],
-              ["Olive", "🍞", "Community pick"],
-              ["Maya", "🎉", "A new chapter"],
-            ].map(([name, emoji, reason], index) => (
-              <div className={`mini-lineup ${index === 2 ? "highlight" : ""}`} key={name}>
-                <span>{index + 1}</span>
-                <Avatar name={name} size="sm" />
-                <div>
-                  <strong>
-                    {name}
-                    <span>{emoji}</span>
-                  </strong>
-                  <small>{reason}</small>
-                </div>
-                <Check size={14} />
+            <div className="ledger-chapter ledger-chapter-after">
+              <div className="ledger-chapter-meta">
+                <span>
+                  NOW <i>·</i> SINCE LAST TIME
+                </span>
+                <span>
+                  <Avatar name="Maya" size="xs" /> MAYA
+                </span>
               </div>
-            ))}
-            <p>Illustrative studio preview</p>
-          </div>
-          <div className="streamer-copy">
-            <span className="eyebrow">FOR THE PERSON BEHIND THE STREAM</span>
+              <p>
+                I got the job! Starting Monday. <span>🥹</span>
+              </p>
+              <div className="ledger-reply">
+                <Avatar name="Luna" size="xs" />
+                <p>
+                  <strong>Luna</strong> Maya!! We knew you could do it.
+                </p>
+              </div>
+            </div>
+            <footer className="ledger-feature-foot">
+              A little update becomes a story worth remembering.
+            </footer>
+          </article>
+        </section>
+
+        <div className="ledger-index" aria-label="What this space makes possible">
+          <span>SMALL UPDATES</span>
+          <i>—</i>
+          <span>GOOD CONVERSATIONS</span>
+          <i>—</i>
+          <span>THE NEXT CHAPTER</span>
+        </div>
+
+        <section className="ledger-how" id="how-it-works">
+          <header className="ledger-section-head">
+            <span className="ledger-section-number">01 / THE RITUAL</span>
             <h2>
-              A few minutes.
+              A thread worth
               <br />
-              <span>A little more together.</span>
+              picking back up.
+            </h2>
+            <p>Three small moments make room for a more thoughtful kind of catch-up.</p>
+          </header>
+          <ol className="ledger-steps">
+            <li>
+              <span>01</span>
+              <div>
+                <h3>Leave a note.</h3>
+                <p>
+                  A small win, a work in progress, a bit of life your community will be glad to
+                  hear.
+                </p>
+              </div>
+            </li>
+            <li>
+              <span>02</span>
+              <div>
+                <h3>Make a little time.</h3>
+                <p>
+                  The streamer brings a fair mix of updates to stream, so different people get their
+                  moment.
+                </p>
+              </div>
+            </li>
+            <li>
+              <span>03</span>
+              <div>
+                <h3>Ask what happened.</h3>
+                <p>
+                  Follow up with the people and the stories you remember. That’s where the next
+                  chapter starts.
+                </p>
+              </div>
+            </li>
+          </ol>
+        </section>
+
+        <section className="ledger-studio">
+          <div className="ledger-rundown" aria-label="Example stream lineup">
+            <header>
+              <span>FROM THE STUDIO DESK</span>
+              <span>
+                TONIGHT <i>·</i> 5 UPDATES
+              </span>
+            </header>
+            <div className="ledger-rundown-row">
+              <span className="ledger-row-no">01</span>
+              <Avatar name="Nina" size="sm" />
+              <div>
+                <strong>Nina</strong>
+                <small>Hasn’t been featured yet</small>
+              </div>
+              <Check size={15} />
+            </div>
+            <div className="ledger-rundown-row">
+              <span className="ledger-row-no">02</span>
+              <Avatar name="Olive" size="sm" />
+              <div>
+                <strong>Olive</strong>
+                <small>Community pick</small>
+              </div>
+              <Check size={15} />
+            </div>
+            <div className="ledger-rundown-row ledger-rundown-featured">
+              <span className="ledger-row-no">03</span>
+              <Avatar name="Maya" size="sm" />
+              <div>
+                <strong>Maya</strong>
+                <small>A new chapter</small>
+              </div>
+              <Check size={15} />
+            </div>
+            <p>One good conversation at a time.</p>
+          </div>
+          <div className="ledger-studio-copy">
+            <span className="ledger-section-number">02 / FOR THE PERSON BEHIND THE STREAM</span>
+            <h2>
+              Give the good stuff
+              <br />
+              room to breathe.
             </h2>
             <p>
-              Give your people a moment that lasts longer than a passing chat message. A
-              ready-to-review lineup and a simple OBS overlay make room for real conversations.
+              A ready-to-review lineup and a simple OBS overlay help turn a passing chat message
+              into a conversation your community can share.
             </p>
-            <a className="text-button" href={destination}>
-              Make room for your community
-              <ArrowUpRight size={16} />
+            <a className="ledger-inline-link" href={destination}>
+              Make room for your community <ArrowUpRight size={15} />
             </a>
           </div>
         </section>
-        <section className="your-say">
-          <ShieldCheck size={28} strokeWidth={1.2} />
-          <div>
-            <h3>Your space. Your say.</h3>
-            <p>
-              Boards are for verified followers. Sharing on the public stream is always a separate
-              choice. Updates stay active for seven days, with story history for thirty.
-            </p>
-          </div>
-          <Link href="/about">
-            How your updates work
-            <ArrowUpRight size={15} />
+
+        <section className="ledger-promise">
+          <span className="ledger-section-number">A NOTE ON PRIVACY</span>
+          <p>
+            Every community has its own board. Sharing an update on stream is always a separate
+            choice.
+          </p>
+          <Link href="/about" className="ledger-inline-link">
+            How your updates work <ArrowUpRight size={15} />
           </Link>
         </section>
-        <section className="landing-final">
-          <span className="eyebrow">THERE’S ALWAYS A LITTLE MORE TO THE STORY</span>
+
+        <section className="ledger-close">
+          <p>There’s always a little more to the story.</p>
           <h2>
-            See you next time<span>?</span>
+            Pick it up
+            <br />
+            <em>next time.</em>
           </h2>
-          <p>We’ll pick up where we left off.</p>
           <a className="button button-primary" href={destination}>
-            Come on in
-            <ArrowUpRight size={16} />
+            {primaryLabel} <ArrowUpRight size={16} />
           </a>
         </section>
       </main>
-      <footer className="landing-footer">
+
+      <footer className="ledger-footer">
         <Brand />
-        <span>A little more connected.</span>
+        <span>Stories shared among people who care.</span>
         <div>
           <Link href="/about">About & your updates</Link>
           <a href="https://github.com/HaggardHarsh/SinceLastTime" target="_blank" rel="noreferrer">
-            Made with Codex ↗
+            Project notes <ArrowUpRight size={12} />
           </a>
         </div>
       </footer>

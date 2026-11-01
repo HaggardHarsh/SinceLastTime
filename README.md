@@ -6,8 +6,7 @@ A Twitch-connected community board, conversation studio, and OBS overlay. Viewer
 
 Built for the Codex × TwitchCon Hackathon.
 
-![The SinceLastTime community board](<img width="1353" height="871" alt="image" src="https://github.com/user-attachments/assets/14fa1be3-ce42-439f-9033-cab6dff3d30a" />
-)
+![The SinceLastTime community board](docs/screenshots/community.png)
 
 ## What’s included
 

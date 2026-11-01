@@ -29,7 +29,7 @@ Profiles live in this application. SinceLastTime does not add fields to Twitchâ€
 
 ## Run the local demo
 
-Requirements: **Node.js 22 LTS (22.12 or newer)**, npm, and PostgreSQL 17. Docker Compose is the easiest way to start the database.
+Requirements: **Node.js 22 LTS (22.12 or newer)**, npm, and PostgreSQL 17. Docker Compose is the easiest way to start the database; Podman Compose is also supported.
 
 ```bash
 git clone https://github.com/HaggardHarsh/SinceLastTime.git
@@ -40,15 +40,28 @@ cp .env.example .env
 
 Set `DEMO_MODE=true` in `.env`. The sample database URL matches the development Compose configuration. Generate a token encryption key with `openssl rand -base64 32` and put it in `TOKEN_ENCRYPTION_KEY` before connecting real Twitch accounts.
 
+Start PostgreSQL with one of these commands:
+
 ```bash
+# Docker: start Docker Desktop or the Docker daemon first.
 docker compose up -d db
+
+# Podman: use this if Docker is not running on your machine.
+podman compose up -d db
+```
+
+Then initialize and run the application:
+
+```bash
 npm run db:generate
 npm run db:migrate
 npm run db:seed
 npm run dev
 ```
 
-Open `http://localhost:3000`. On the sign-in screen, choose **Try viewer demo** or **Try streamer demo**; no Twitch credentials are needed for these sample identities. The local demo bar switches between Maya (viewer), Luna (streamer), Rohan (moderator), Olive (viewer), and a non-follower. The seeded board is `/c/luna`.
+Open `http://localhost:3000`. `GET` lines in the terminal show that the development server is running; `GET /api/me 401` is expected before signing in. On the sign-in screen, choose **Try viewer demo** or **Try streamer demo**; no Twitch credentials are needed for these sample identities. The local demo bar switches between Maya (viewer), Luna (streamer), Rohan (moderator), Olive (viewer), and a non-follower. The seeded board is `/c/luna`.
+
+If you keep two local checkouts, they cannot both use the default database port (`5432`) or development port (`3000`). Stop the other checkout first, or give one checkout a different PostgreSQL port and `DATABASE_URL` before starting it.
 
 Run the worker in a second terminal:
 
